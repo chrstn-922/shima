@@ -169,6 +169,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Check that implemented features match the original specification
    - Validate that tests pass and coverage meets requirements
    - Confirm the implementation follows the technical plan
+   - **README sync (mandatory)**: After marking any phase complete in `specs/001-shima-dynamic-island/tasks.md`, update the Roadmap table and status text in `README.md` to match before ending the turn.
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit.tasks` first to regenerate the task list.
 
@@ -214,5 +215,6 @@ Report final status with summary of completed work.
 
 - [ ] All tasks in tasks.md completed and marked `[X]`
 - [ ] Implementation validated against specification, plan, and test coverage
+- [ ] README.md Roadmap table and status text match `specs/001-shima-dynamic-island/tasks.md` when a phase was completed
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with summary of completed work
