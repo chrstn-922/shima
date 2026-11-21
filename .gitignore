@@ -1,0 +1,4 @@
+# Spec Kit local state
+.specify/**/local-config.yml
+.specify/**/*-config.local.yml
+.specify/workflows/runs/
