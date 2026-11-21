@@ -46,17 +46,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Write unit tests for `IslandStateManager` and `OverlayPinController` priority arbitration (`SystemSuspended > ExplicitPin > FullscreenHardHide > HotkeySummon > Expanded > Peek > Active > Collapsed`) in `tests/Shima.Core.Tests/IslandVisibilityArbiterTests.cs`
-- [ ] T012 [P] [US1] Write interop tests for monitor fallback, `WM_DPICHANGED` geometry calculation, and `WS_EX_NOACTIVATE` style preservation in `tests/Shima.WindowsInterop.Tests/OverlayWindowAdapterTests.cs`
+- [X] T011 [P] [US1] Write unit tests for `IslandStateManager` and `OverlayPinController` priority arbitration (`SystemSuspended > ExplicitPin > FullscreenHardHide > HotkeySummon > Expanded > Peek > Active > Collapsed`) in `tests/Shima.Core.Tests/IslandVisibilityArbiterTests.cs`
+- [X] T012 [P] [US1] Write interop tests for monitor fallback, `WM_DPICHANGED` geometry calculation, and `WS_EX_NOACTIVATE` style preservation in `tests/Shima.WindowsInterop.Tests/OverlayWindowAdapterTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T013 [P] [US1] Implement `OverlayWindowAdapter` (`WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, `SetInteractiveFocusMode`, `Alt`+hover `WS_EX_TRANSPARENT` click-through) in `src/Shima.WindowsInterop/Overlay/OverlayWindowAdapter.cs`
-- [ ] T014 [P] [US1] Implement `DisplayTopologyMonitor`, `FullscreenDetector` (`SetWinEventHook` + `SHQueryUserNotificationState` + rect check), `GlobalHotkeyService`, and `PowerAndMotionMonitor` (`GUID_POWER_SAVING_STATUS`, `UISettings.AnimationsEnabled`) in `src/Shima.WindowsInterop/System/`
-- [ ] T015 [US1] Implement `IslandStateManager` and `OverlayPinController` (`AcquirePin` / `ReleasePin`) in `src/Shima.Core/Shell/`
-- [ ] T016 [US1] Build WPF `IslandWindow`, concave top-fillet `StreamGeometry` renderer, 8-dot vertical carousel (`WidgetHost`), and Reduced-Motion-aware morph animations in `src/Shima.Presentation/Shell/`
-- [ ] T017 [P] [US1] Implement `StartupRegistrationAdapter` (`StartupTask` + `HKCU\...\Run` fallback), single-instance mutex, and System Tray icon menu in `src/Shima.App/`
-- [ ] T018 [US1] Add automated FlaUI shell checks verifying focus preservation (`GetForegroundWindow` unchanged) and fullscreen hide behavior in `tests/Shima.UI.Tests/IslandShellUiTests.cs`
+- [X] T013 [P] [US1] Implement `OverlayWindowAdapter` (`WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, `SetInteractiveFocusMode`, `Alt`+hover `WS_EX_TRANSPARENT` click-through) in `src/Shima.WindowsInterop/Overlay/OverlayWindowAdapter.cs`
+- [X] T014 [P] [US1] Implement `DisplayTopologyMonitor`, `FullscreenDetector` (`SetWinEventHook` + `SHQueryUserNotificationState` + rect check), `GlobalHotkeyService`, and `PowerAndMotionMonitor` (`GUID_POWER_SAVING_STATUS`, `UISettings.AnimationsEnabled`) in `src/Shima.WindowsInterop/System/`
+- [X] T015 [US1] Implement `IslandStateManager` and `OverlayPinController` (`AcquirePin` / `ReleasePin`) in `src/Shima.Core/Shell/`
+- [X] T016 [US1] Build WPF `IslandWindow`, concave top-fillet `StreamGeometry` renderer, 8-dot vertical carousel (`WidgetHost`), and Reduced-Motion-aware morph animations in `src/Shima.Presentation/Shell/`
+- [X] T017 [P] [US1] Implement `StartupRegistrationAdapter` (`StartupTask` + `HKCU\...\Run` fallback), single-instance mutex, and System Tray icon menu in `src/Shima.App/`
+- [X] T018 [US1] Add automated FlaUI shell checks verifying focus preservation (`GetForegroundWindow` unchanged) and fullscreen hide behavior in `tests/Shima.UI.Tests/IslandShellUiTests.cs`
 
 **Checkpoint**: Core Dynamic Island shell operates independently at `0.0%` idle CPU with full DPI, fullscreen, and maximized-window compliance.
 

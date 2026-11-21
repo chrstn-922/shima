@@ -1,0 +1,144 @@
+<Window x:Class="Shima.Presentation.Shell.IslandWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:Shima.Presentation.Shell"
+        Title="Shima Dynamic Island"
+        Width="136"
+        Height="28"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ShowActivated="False"
+        Focusable="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        AutomationProperties.Name="Shima Dynamic Island"
+        AutomationProperties.AutomationId="ShimaIslandWindow"
+        MouseEnter="OnWindowMouseEnter"
+        MouseMove="OnWindowMouseMove"
+        MouseLeave="OnWindowMouseLeave"
+        MouseLeftButtonUp="OnWindowMouseLeftButtonUp"
+        PreviewKeyDown="OnWindowPreviewKeyDown">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Shima.Presentation;component/Theming/ThemeTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="PillActionButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource SurfacePillButton}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="10,4" />
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="11.5" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="BorderRoot"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="12"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BorderRoot" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="BorderRoot" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                    <Setter TargetName="BorderRoot" Property="BorderThickness" Value="2" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid x:Name="RootContainer"
+          RenderTransformOrigin="0.5,0">
+        <Grid.RenderTransform>
+            <ScaleTransform x:Name="MorphScaleTransform" ScaleX="1" ScaleY="1" />
+        </Grid.RenderTransform>
+
+        <Path x:Name="NotchSurfacePath"
+              Fill="{DynamicResource SurfaceCollapsed}"
+              Stroke="{DynamicResource BorderHairline}"
+              StrokeThickness="1"
+              Stretch="None" />
+
+        <!-- Compact active pill content -->
+        <Grid x:Name="ActiveLayer"
+              Margin="18,4,18,4"
+              Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center">
+                <Ellipse Width="6"
+                         Height="6"
+                         Margin="0,0,8,0"
+                         Fill="{DynamicResource AccentBrush}" />
+                <TextBlock x:Name="ActiveBadgeText"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="12"
+                           FontWeight="Medium"
+                           Foreground="{DynamicResource TextPrimary}"
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.Name="Active pill status" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Notification peek layer -->
+        <Grid x:Name="NotificationLayer"
+              Margin="24,10,24,12"
+              Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                <TextBlock x:Name="NotificationTitleText"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"
+                           Text="Notification"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="NotificationBodyText"
+                           Margin="0,2,0,0"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           Text="Tap to open or dismiss."
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <Button x:Name="DismissNotificationButton"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PillActionButtonStyle}"
+                    Content="Dismiss"
+                    Click="OnDismissNotificationClicked"
+                    AutomationProperties.Name="Dismiss notification"
+                    AutomationProperties.AutomationId="DismissNotificationButton" />
+        </Grid>
+
+        <!-- Expanded panel hosting widget carousel -->
+        <Grid x:Name="ExpandedLayer"
+              Margin="26,16,24,16"
+              Visibility="Collapsed">
+            <shell:WidgetHost x:Name="WidgetHostControl" />
+        </Grid>
+    </Grid>
+</Window>

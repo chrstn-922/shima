@@ -24,7 +24,39 @@ public interface IIslandStateManager
 {
     IslandShellState CurrentState { get; }
 
+    VisibilityPriority CurrentPriority { get; }
+
+    bool FullscreenBreakthroughAlerts { get; set; }
+
+    bool IsNotificationsPaused { get; set; }
+
+    string? CompactPillBadgeText { get; }
+
+    TimeSpan CurrentNotificationTtl { get; }
+
     event EventHandler<IslandStateChangedEventArgs>? StateChanged;
 
     Task TransitionToAsync(IslandShellState newState, CancellationToken ct = default);
+
+    void SetSystemSuspended(bool suspended);
+
+    void SetFullscreenOnHostMonitor(bool isFullscreen);
+
+    void SetCompactActive(bool isActive, string? badgeText = null);
+
+    void RequestNotificationPeek(NotificationPriority priority, TimeSpan ttl);
+
+    void ClearNotificationPeek();
+
+    void RequestUserExpand();
+
+    void RequestUserCollapse(bool force = false);
+
+    void ToggleHotkeySummon();
+
+    void DismissHotkeySummon();
+
+    void SetInputFocusActive(bool isFocused);
+
+    void Reevaluate();
 }
