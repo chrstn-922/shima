@@ -6,6 +6,10 @@ IsWindowVisible
 GetForegroundWindow
 GetWindowRect
 GetClassName
+DwmGetWindowAttribute
+DWMWINDOWATTRIBUTE
+IsZoomed
+WINDOW_STYLE
 MonitorFromWindow
 MonitorFromPoint
 GetCursorPos

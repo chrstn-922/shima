@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Shima.Core\Shima.Core.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Infrastructure\Shima.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Shima.WindowsInterop\Shima.WindowsInterop.csproj" />
     <ProjectReference Include="..\..\src\Shima.Presentation\Shima.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Shima.App\Shima.App.csproj" />

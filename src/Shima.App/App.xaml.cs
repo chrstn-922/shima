@@ -1,13 +1,19 @@
 using System.IO;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using Shima.Core.Appearance;
+using Shima.Core.Color;
 using Shima.Core.Contracts;
 using Shima.Core.Shell;
 using Shima.Core.Widgets;
+using Shima.Infrastructure.Appearance;
+using Shima.Infrastructure.Color;
 using Shima.Infrastructure.Configuration;
 using Shima.Infrastructure.Persistence;
 using Shima.Infrastructure.Storage;
+using Shima.Presentation.Settings;
 using Shima.Presentation.Shell;
+using Shima.Presentation.Theming;
 using Shima.WindowsInterop.Overlay;
 using Shima.WindowsInterop.System;
 
@@ -20,6 +26,7 @@ public partial class App : Application
     private SingleInstanceGuard? _singleInstanceGuard;
     private ServiceProvider? _serviceProvider;
     private ILogger? _logger;
+    private SettingsWindow? _settingsWindow;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -40,10 +47,11 @@ public partial class App : Application
             Directory.CreateDirectory(dataRoot);
 
             var databasePath = Path.Combine(dataRoot, "shima.db");
-            var logFilePath = Path.Combine(dataRoot, "logs", "shima.log");
+            var logDirectory = Path.Combine(dataRoot, "logs");
+            var logFilePath = Path.Combine(logDirectory, "shima.log");
 
             var services = new ServiceCollection();
-            ConfigureServices(services, dataRoot, databasePath, logFilePath);
+            ConfigureServices(services, dataRoot, databasePath, logDirectory, logFilePath);
 
             _serviceProvider = services.BuildServiceProvider();
             _logger = _serviceProvider.GetRequiredService<ILogger>();
@@ -51,20 +59,28 @@ public partial class App : Application
             var migrationRunner = _serviceProvider.GetRequiredService<SqliteMigrationRunner>();
             await migrationRunner.InitializeAsync().ConfigureAwait(true);
 
-            var preferencesStore = _serviceProvider.GetRequiredService<AppPreferencesStore>();
-            var preferences = await preferencesStore.LoadAsync().ConfigureAwait(true);
+            var preferencesService = _serviceProvider.GetRequiredService<IAppPreferencesService>();
+            await preferencesService.InitializeAsync().ConfigureAwait(true);
+            var preferences = preferencesService.Current;
+
+            var appearanceManager = _serviceProvider.GetRequiredService<IAppearanceManager>();
+            await appearanceManager.InitializeAsync().ConfigureAwait(true);
 
             var widgetRegistry = _serviceProvider.GetRequiredService<WidgetRegistry>();
             await widgetRegistry.InitializeAsync().ConfigureAwait(true);
 
             var islandWindow = _serviceProvider.GetRequiredService<IslandWindow>();
-            islandWindow.ApplyBehaviorPreferences(
-                MapMonitorSelectionMode(preferences.TargetMonitorMode),
-                preferences.SpecificMonitorDeviceId,
-                preferences.ExpandOnHover,
-                preferences.HoverExpandDelayMs,
-                preferences.AutoCollapseDelayMs,
-                preferences.FullscreenBreakthroughAlerts);
+            var themeRenderer = _serviceProvider.GetRequiredService<ThemeRenderer>();
+            if (Current?.Resources is not null)
+            {
+                themeRenderer.AttachResourceDictionary(Current.Resources);
+            }
+
+            themeRenderer.AttachFrameworkElement(islandWindow);
+            themeRenderer.AttachFrameworkElement(islandWindow.WidgetHost);
+            themeRenderer.ApplyNow();
+
+            ApplyPreferencesToShell(islandWindow, preferences);
 
             var slots = widgetRegistry.Widgets
                 .Where(widget => widget.IsEnabled)
@@ -75,16 +91,22 @@ public partial class App : Application
             islandWindow.Show();
 
             var hotkeyService = _serviceProvider.GetRequiredService<IGlobalHotkeyService>();
-            var gesture = string.IsNullOrWhiteSpace(preferences.GlobalToggleHotkey)
-                ? DefaultGlobalHotkey
-                : preferences.GlobalToggleHotkey;
-            if (!hotkeyService.TryRegister(islandWindow.WindowHandle, gesture, out var hotkeyError))
+            TryApplyGlobalHotkey(hotkeyService, islandWindow.WindowHandle, preferences.GlobalToggleHotkey);
+
+            preferencesService.PreferencesChanged += (_, updated) =>
             {
-                _logger.Warn($"Global hotkey '{gesture}' could not be registered: {hotkeyError}");
-            }
+                Dispatcher.BeginInvoke(() =>
+                {
+                    ApplyPreferencesToShell(islandWindow, updated);
+                    TryApplyGlobalHotkey(hotkeyService, islandWindow.WindowHandle, updated.GlobalToggleHotkey);
+                });
+            };
 
             var trayService = _serviceProvider.GetRequiredService<SystemTrayService>();
-            trayService.Attach(islandWindow, () => Dispatcher.Invoke(() => Shutdown(0)));
+            trayService.Attach(
+                islandWindow,
+                () => Dispatcher.Invoke(() => Shutdown(0)),
+                () => Dispatcher.BeginInvoke(ShowOrActivateSettings));
         }
         catch (Exception ex)
         {
@@ -95,6 +117,20 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_settingsWindow is not null)
+        {
+            try
+            {
+                _settingsWindow.Close();
+            }
+            catch
+            {
+                // Ignore Settings teardown errors on shutdown.
+            }
+
+            _settingsWindow = null;
+        }
+
         if (_serviceProvider is not null)
         {
             try
@@ -120,15 +156,82 @@ public partial class App : Application
         base.OnExit(e);
     }
 
+    private void ShowOrActivateSettings()
+    {
+        if (_serviceProvider is null)
+        {
+            return;
+        }
+
+        if (_settingsWindow is { IsLoaded: true })
+        {
+            if (_settingsWindow.WindowState == WindowState.Minimized)
+            {
+                _settingsWindow.WindowState = WindowState.Normal;
+            }
+
+            _settingsWindow.Activate();
+            return;
+        }
+
+        _settingsWindow = _serviceProvider.GetRequiredService<SettingsWindow>();
+        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        _settingsWindow.Show();
+        _settingsWindow.Activate();
+    }
+
+    private static void ApplyPreferencesToShell(IslandWindow islandWindow, AppPreferencesSnapshot preferences) =>
+        islandWindow.ApplyBehaviorPreferences(
+            preferences.MonitorSelectionMode,
+            preferences.SpecificMonitorDeviceId,
+            preferences.ExpandOnHover,
+            preferences.HoverExpandDelayMs,
+            preferences.AutoCollapseDelayMs,
+            preferences.FullscreenBreakthroughAlerts);
+
+    private void TryApplyGlobalHotkey(IGlobalHotkeyService hotkeyService, nint hwnd, string? rawGesture)
+    {
+        if (hwnd == 0)
+        {
+            return;
+        }
+
+        var gesture = string.IsNullOrWhiteSpace(rawGesture) ? DefaultGlobalHotkey : rawGesture;
+        if (!hotkeyService.TryRegister(hwnd, gesture, out var hotkeyError))
+        {
+            _logger?.Warn($"Global hotkey '{gesture}' could not be registered: {hotkeyError}");
+        }
+    }
+
     private static void ConfigureServices(
         IServiceCollection services,
         string dataRoot,
         string databasePath,
+        string logDirectory,
         string logFilePath)
     {
         services.AddSingleton<ILogger>(_ => new SanitizedFileLogger(logFilePath));
+        services.AddSingleton<IDiagnosticLogService>(_ => new DiagnosticLogService(logDirectory));
+        services.AddSingleton<ISecureSecretStore, DpapiSecretStore>();
+
         services.AddSingleton<IAtomicConfigStore<AppPreferences>>(_ => new AtomicConfigStore<AppPreferences>(dataRoot));
         services.AddSingleton<AppPreferencesStore>();
+        services.AddSingleton<IAppPreferencesService, AppPreferencesService>();
+
+        services.AddSingleton<IAtomicConfigStore<AppearanceConfiguration>>(_ => new AtomicConfigStore<AppearanceConfiguration>(dataRoot));
+        services.AddSingleton<IAppearanceConfigRepository, AtomicAppearanceConfigRepository>();
+        services.AddSingleton<IAtomicConfigStore<PresetCatalog>>(_ => new AtomicConfigStore<PresetCatalog>(dataRoot));
+        services.AddSingleton<IPresetCatalogRepository, AtomicPresetCatalogRepository>();
+
+        services.AddSingleton<ColorProcessingService>();
+        services.AddSingleton<IColorProcessingService>(sp => sp.GetRequiredService<ColorProcessingService>());
+        services.AddSingleton<IContrastAuditor>(sp => sp.GetRequiredService<ColorProcessingService>());
+        services.AddSingleton<IPresetManager, PresetManager>();
+        services.AddSingleton<AppearanceManager>();
+        services.AddSingleton<IAppearanceManager>(sp => sp.GetRequiredService<AppearanceManager>());
+        services.AddSingleton<IThemeTokenProvider>(sp => sp.GetRequiredService<AppearanceManager>());
+        services.AddSingleton<ThemeRenderer>();
+
         services.AddSingleton(_ => new SqliteMigrationRunner(databasePath));
         services.AddSingleton<IWidgetConfigRepository>(_ => new SqliteWidgetConfigRepository(databasePath));
 
@@ -136,9 +239,9 @@ public partial class App : Application
         services.AddSingleton<IOverlayPinController, OverlayPinController>();
         services.AddSingleton<IIslandStateManager, IslandStateManager>();
         services.AddSingleton<IIslandAttentionRequester, IslandAttentionRequester>();
-        services.AddSingleton<IThemeTokenProvider, DefaultThemeTokenProvider>();
         services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(Array.Empty<WidgetModuleRegistration>());
         services.AddSingleton<WidgetRegistry>();
+        services.AddSingleton<IWidgetSettingsCoordinator, WidgetRegistrySettingsCoordinator>();
 
         services.AddSingleton<IOverlayWindowAdapter, OverlayWindowAdapter>();
         services.AddSingleton<IDisplayTopologyMonitor, DisplayTopologyMonitor>();
@@ -149,12 +252,6 @@ public partial class App : Application
 
         services.AddSingleton<SystemTrayService>();
         services.AddSingleton<IslandWindow>();
+        services.AddTransient<SettingsWindow>();
     }
-
-    private static MonitorSelectionMode MapMonitorSelectionMode(TargetMonitorMode mode) => mode switch
-    {
-        TargetMonitorMode.ActiveCursor => MonitorSelectionMode.ActiveCursor,
-        TargetMonitorMode.SpecificMonitorId => MonitorSelectionMode.SpecificMonitorId,
-        _ => MonitorSelectionMode.Primary
-    };
 }

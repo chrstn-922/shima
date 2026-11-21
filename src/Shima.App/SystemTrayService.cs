@@ -17,6 +17,7 @@ public sealed class SystemTrayService : IDisposable
     private readonly NativeTrayIconHost _trayHost;
     private IslandWindow? _islandWindow;
     private Action? _shutdownCallback;
+    private Action? _openSettingsCallback;
     private bool _disposed;
 
     public SystemTrayService(IIslandStateManager stateManager, ILogger logger)
@@ -29,11 +30,15 @@ public sealed class SystemTrayService : IDisposable
         _trayHost.MenuItemClicked += OnMenuItemClicked;
     }
 
-    public void Attach(IslandWindow islandWindow, Action shutdownCallback)
+    public void Attach(
+        IslandWindow islandWindow,
+        Action shutdownCallback,
+        Action? openSettingsCallback = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _islandWindow = islandWindow ?? throw new ArgumentNullException(nameof(islandWindow));
         _shutdownCallback = shutdownCallback ?? throw new ArgumentNullException(nameof(shutdownCallback));
+        _openSettingsCallback = openSettingsCallback;
 
         if (islandWindow.WindowHandle == 0)
         {
@@ -86,7 +91,15 @@ public sealed class SystemTrayService : IDisposable
                 break;
 
             case CmdOpenSettings:
-                _logger.Info("Settings window trigger invoked from system tray (enabled in Phase 4).");
+                if (_openSettingsCallback is not null)
+                {
+                    _openSettingsCallback();
+                }
+                else
+                {
+                    _logger.Info("Settings window trigger invoked from system tray, but no settings handler is attached.");
+                }
+
                 break;
 
             case CmdToggleZenNotifications:

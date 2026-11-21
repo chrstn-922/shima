@@ -154,8 +154,9 @@ public sealed class OverlayWindowAdapterTests
         query.ClassName = "Progman";
         query.MonitorHandle = monitor1;
         query.MonitorBounds = bounds1;
-        query.WindowRect = bounds1;
-        query.HasWindowRect = true;
+        query.WorkArea = bounds1;
+        query.WindowBounds = bounds1;
+        query.HasWindowBounds = true;
         query.NotificationState = UserNotificationQueryState.AcceptsNotifications;
 
         detector.EvaluateNow();
@@ -167,7 +168,10 @@ public sealed class OverlayWindowAdapterTests
         query.ClassName = "UnrealWindow";
         query.MonitorHandle = monitor2;
         query.MonitorBounds = bounds2;
-        query.WindowRect = bounds2;
+        query.WorkArea = new MonitorBounds(1920, 0, 2560, 1392);
+        query.WindowBounds = bounds2;
+        query.WindowStyle = 0;
+        query.IsMaximized = false;
 
         detector.EvaluateNow();
         detector.IsMonitorFullscreen(monitor1).Should().BeFalse();
@@ -179,7 +183,8 @@ public sealed class OverlayWindowAdapterTests
         query.ClassName = "Chrome_WidgetWin_1";
         query.MonitorHandle = monitor1;
         query.MonitorBounds = bounds1;
-        query.WindowRect = new MonitorBounds(100, 100, 900, 600);
+        query.WorkArea = new MonitorBounds(0, 0, 1920, 1032);
+        query.WindowBounds = new MonitorBounds(100, 100, 900, 600);
 
         detector.EvaluateNow();
         detector.IsMonitorFullscreen(monitor2).Should().BeFalse();
@@ -273,24 +278,34 @@ public sealed class OverlayWindowAdapterTests
 
         public MonitorBounds MonitorBounds { get; set; }
 
-        public MonitorBounds WindowRect { get; set; }
+        public MonitorBounds WorkArea { get; set; }
 
-        public bool HasWindowRect { get; set; }
+        public MonitorBounds WindowBounds { get; set; }
+
+        public bool HasWindowBounds { get; set; }
+
+        public int WindowStyle { get; set; }
+
+        public bool IsMaximized { get; set; }
 
         public UserNotificationQueryState NotificationState { get; set; } = UserNotificationQueryState.AcceptsNotifications;
 
         public nint GetForegroundWindow() => ForegroundHwnd;
 
-        public bool TryGetWindowRect(nint hwnd, out MonitorBounds rect)
+        public bool TryGetWindowBounds(nint hwnd, out MonitorBounds bounds)
         {
-            rect = WindowRect;
-            return HasWindowRect;
+            bounds = WindowBounds;
+            return HasWindowBounds;
         }
+
+        public int GetWindowStyle(nint hwnd) => WindowStyle;
+
+        public bool IsWindowMaximized(nint hwnd) => IsMaximized;
 
         public string GetWindowClassName(nint hwnd) => ClassName;
 
-        public (nint MonitorHandle, MonitorBounds MonitorBounds) GetMonitorForWindow(nint hwnd) =>
-            (MonitorHandle, MonitorBounds);
+        public (nint MonitorHandle, MonitorBounds MonitorBounds, MonitorBounds WorkArea) GetMonitorForWindow(nint hwnd) =>
+            (MonitorHandle, MonitorBounds, WorkArea);
 
         public UserNotificationQueryState QueryUserNotificationState() => NotificationState;
     }

@@ -65,6 +65,7 @@ public sealed class AppPreferences
     public bool ClaudeCodeOptInEnabled { get; set; }
     public bool OpenCodeOptInEnabled { get; set; }
     public string? OpenCodeEndpointUrl { get; set; }
+    public byte[]? OpenCodeServerPassword { get; set; }
     public bool UpdatesOfflineMode { get; set; }
     public byte[]? LicenseState { get; set; }
 }

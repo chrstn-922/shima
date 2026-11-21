@@ -1,0 +1,210 @@
+<Window x:Class="Shima.Presentation.ColorPicker.ColorPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:picker="clr-namespace:Shima.Presentation.ColorPicker"
+        Title="Advanced Color Picker"
+        Width="660"
+        Height="510"
+        MinWidth="600"
+        MinHeight="470"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource SurfaceSettingsWindow}"
+        Foreground="{DynamicResource TextPrimary}"
+        PreviewKeyDown="OnWindowPreviewKeyDown"
+        Closing="OnWindowClosing"
+        AutomationProperties.Name="Advanced Color Picker dialog"
+        AutomationProperties.AutomationId="ColorPickerDialogWindow">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Shima.Presentation;component/Theming/ThemeTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="PickerButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource SurfaceSettingsCard}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="BtnBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="7"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                    <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="PickerPrimaryButtonStyle" BasedOn="{StaticResource PickerButtonStyle}" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource SettingsPrimaryButton}" />
+                <Setter Property="Foreground" Value="{DynamicResource SettingsPrimaryButtonText}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsPrimaryButton}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header & Live Preview State Selector -->
+        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Left">
+                <TextBlock x:Name="TokenHeaderTitle"
+                           Text="Edit appearance color"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}" />
+                <TextBlock x:Name="PinStateIndicator"
+                           Text="Live preview pinned on desktop"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           Margin="0,2,0,0"
+                           AutomationProperties.Name="Live preview pin status"
+                           AutomationProperties.AutomationId="LivePreviewPinStatusText" />
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <TextBlock Text="Preview state:"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextMuted}" />
+                <RadioButton x:Name="PreviewCollapsedRadio"
+                             Content="Collapsed"
+                             GroupName="IslandPreviewState"
+                             Margin="0,0,8,0"
+                             Foreground="{DynamicResource TextPrimary}"
+                             Checked="OnPreviewStateChecked"
+                             AutomationProperties.Name="Preview collapsed island state"
+                             AutomationProperties.AutomationId="PreviewCollapsedRadio" />
+                <RadioButton x:Name="PreviewExpandedRadio"
+                             Content="Expanded"
+                             GroupName="IslandPreviewState"
+                             Foreground="{DynamicResource TextPrimary}"
+                             Checked="OnPreviewStateChecked"
+                             AutomationProperties.Name="Preview expanded island state"
+                             AutomationProperties.AutomationId="PreviewExpandedRadio" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Non-blocking WCAG 2.1 Contrast Advisory Banner -->
+        <Border x:Name="ContrastWarningBanner"
+                Grid.Row="1"
+                Margin="0,0,0,12"
+                Padding="12,8"
+                CornerRadius="8"
+                Background="{DynamicResource WarningBannerSurface}"
+                BorderBrush="{DynamicResource WarningBannerBorder}"
+                BorderThickness="1"
+                Visibility="Collapsed"
+                AutomationProperties.Name="Contrast advisory warning banner"
+                AutomationProperties.AutomationId="ContrastWarningBanner">
+            <DockPanel LastChildFill="True">
+                <Button x:Name="RestoreContrastButton"
+                        DockPanel.Dock="Right"
+                        Margin="10,0,0,0"
+                        Style="{StaticResource PickerButtonStyle}"
+                        Content="Restore recommended contrast"
+                        Click="OnRestoreContrastClicked"
+                        AutomationProperties.Name="Restore recommended contrast"
+                        AutomationProperties.AutomationId="RestoreContrastButton" />
+                <TextBlock x:Name="ContrastWarningText"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource WarningBannerText}" />
+            </DockPanel>
+        </Border>
+
+        <!-- Main Studio Area -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <picker:ColorSelectionField x:Name="SelectionField"
+                                        Grid.Column="0" />
+
+            <picker:HueSpectrumSlider x:Name="HueSlider"
+                                      Grid.Column="2" />
+
+            <StackPanel Grid.Column="4" VerticalAlignment="Top">
+                <picker:ColorPreviewPanel x:Name="PreviewPanel"
+                                          Margin="0,0,0,14" />
+
+                <Border Background="{DynamicResource SurfaceSettingsCard}"
+                        BorderBrush="{DynamicResource SettingsBorderSubtle}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="12">
+                    <picker:ColorNumericInputs x:Name="NumericInputs" />
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- Footer Action Bar -->
+        <DockPanel Grid.Row="3" Margin="0,14,0,0" LastChildFill="False">
+            <Button x:Name="ResetSlotButton"
+                    DockPanel.Dock="Left"
+                    Style="{StaticResource PickerButtonStyle}"
+                    Content="Reset slot to default"
+                    Click="OnResetSlotClicked"
+                    AutomationProperties.Name="Reset active slot to default"
+                    AutomationProperties.AutomationId="ResetSlotButton" />
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="CancelButton"
+                        Style="{StaticResource PickerButtonStyle}"
+                        Content="Cancel"
+                        IsCancel="True"
+                        Margin="0,0,8,0"
+                        Click="OnCancelClicked"
+                        AutomationProperties.Name="Cancel color changes"
+                        AutomationProperties.AutomationId="CancelColorPickerButton" />
+                <Button x:Name="ApplyButton"
+                        Style="{StaticResource PickerPrimaryButtonStyle}"
+                        Content="Apply"
+                        IsDefault="True"
+                        Click="OnApplyClicked"
+                        AutomationProperties.Name="Apply color changes"
+                        AutomationProperties.AutomationId="ApplyColorPickerButton" />
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

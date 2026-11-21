@@ -1,0 +1,951 @@
+<Window x:Class="Shima.Presentation.Settings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Shima Settings"
+        Width="940"
+        Height="660"
+        MinWidth="860"
+        MinHeight="620"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource SurfaceSettingsWindow}"
+        Foreground="{DynamicResource TextPrimary}"
+        AutomationProperties.Name="Shima Settings window"
+        AutomationProperties.AutomationId="ShimaSettingsWindow">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Shima.Presentation;component/Theming/ThemeTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="SectionHeadingStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="20" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="Margin" Value="0,0,0,4" />
+            </Style>
+
+            <Style x:Key="SectionSubheadingStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="12.5" />
+                <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                <Setter Property="Margin" Value="0,0,0,16" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="SettingsCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource SurfaceSettingsCard}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="Margin" Value="0,0,0,12" />
+            </Style>
+
+            <Style x:Key="SettingsActionButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="BtnBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="7"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                    <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="SettingsPrimaryButtonStyle" BasedOn="{StaticResource SettingsActionButtonStyle}" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource SettingsPrimaryButton}" />
+                <Setter Property="Foreground" Value="{DynamicResource SettingsPrimaryButtonText}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsPrimaryButton}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <Style x:Key="SettingsDangerButtonStyle" BasedOn="{StaticResource SettingsActionButtonStyle}" TargetType="Button">
+                <Setter Property="Background" Value="{DynamicResource SettingsDangerSurface}" />
+                <Setter Property="Foreground" Value="{DynamicResource SettingsDangerText}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsDangerBorder}" />
+            </Style>
+
+            <Style x:Key="SettingsInputBoxStyle" TargetType="TextBox">
+                <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="8,6" />
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="12.5" />
+            </Style>
+
+            <Style x:Key="NavRailItemStyle" TargetType="ListBoxItem">
+                <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Padding" Value="12,9" />
+                <Setter Property="Margin" Value="0,0,0,4" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="ItemBorder"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="1"
+                                    CornerRadius="7"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Fixed 220 DIP 10-Section Navigation Rail per ui-ux-design-system.md -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SurfaceSettingsSidebar}"
+                BorderBrush="{DynamicResource SettingsBorderSubtle}"
+                BorderThickness="0,0,1,0"
+                Padding="14,18">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Top" Margin="6,0,6,18">
+                    <TextBlock Text="Shima"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}" />
+                    <TextBlock Text="Windows Dynamic Island"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="11.5"
+                               Foreground="{DynamicResource TextMuted}" />
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Bottom"
+                           x:Name="StatusFooterText"
+                           Margin="6,10,6,0"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextMuted}"
+                           Text="Ready"
+                           TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="SettingsStatusFooterText" />
+
+                <ListBox x:Name="NavigationRail"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         ItemContainerStyle="{StaticResource NavRailItemStyle}"
+                         SelectionChanged="OnNavigationSelectionChanged"
+                         AutomationProperties.Name="Settings sections navigation"
+                         AutomationProperties.AutomationId="SettingsNavigationRail">
+                    <ListBoxItem Tag="General" Content="General" AutomationProperties.AutomationId="NavGeneral" />
+                    <ListBoxItem Tag="Widgets" Content="Widgets" AutomationProperties.AutomationId="NavWidgets" />
+                    <ListBoxItem Tag="Notifications" Content="Notifications" AutomationProperties.AutomationId="NavNotifications" />
+                    <ListBoxItem Tag="Clipboard" Content="Clipboard" AutomationProperties.AutomationId="NavClipboard" />
+                    <ListBoxItem Tag="FocusTimer" Content="Focus Timer" AutomationProperties.AutomationId="NavFocusTimer" />
+                    <ListBoxItem Tag="Clock" Content="Clock" AutomationProperties.AutomationId="NavClock" />
+                    <ListBoxItem Tag="DeveloperIntegrations" Content="Developer Integrations" AutomationProperties.AutomationId="NavDeveloperIntegrations" />
+                    <ListBoxItem Tag="Appearance" Content="Appearance &amp; Customization" AutomationProperties.AutomationId="NavAppearance" />
+                    <ListBoxItem Tag="Updates" Content="Updates" AutomationProperties.AutomationId="NavUpdates" />
+                    <ListBoxItem Tag="License" Content="License" AutomationProperties.AutomationId="NavLicense" />
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Scrollable Content Canvas -->
+        <ScrollViewer Grid.Column="1"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="24,22">
+            <StackPanel>
+                <!-- 1. General -->
+                <StackPanel x:Name="PanelGeneral" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="General" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Manage Windows startup registration, monitor placement, hotkeys, behavior timings, and diagnostic logs." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <CheckBox x:Name="StartWithWindowsCheck"
+                                      Content="Start Shima automatically when signing into Windows"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Checked="OnGeneralCheckChanged"
+                                      Unchecked="OnGeneralCheckChanged"
+                                      AutomationProperties.AutomationId="StartWithWindowsCheck" />
+                            <TextBlock x:Name="StartupModeStatusText"
+                                       Margin="22,6,0,12"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="Startup registration mode: Windows per-user Run key" />
+
+                            <TextBlock Text="Target monitor"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Margin="0,0,0,6" />
+                            <ComboBox x:Name="MonitorModeCombo"
+                                      Width="280"
+                                      HorizontalAlignment="Left"
+                                      Margin="0,0,0,8"
+                                      SelectionChanged="OnBehaviorSelectionChanged"
+                                      AutomationProperties.AutomationId="MonitorModeCombo">
+                                <ComboBoxItem Tag="Primary" Content="Primary monitor" />
+                                <ComboBoxItem Tag="ActiveCursor" Content="Monitor under mouse cursor" />
+                                <ComboBoxItem Tag="SpecificMonitorId" Content="Specific display" />
+                            </ComboBox>
+
+                            <ComboBox x:Name="SpecificMonitorCombo"
+                                      Width="280"
+                                      HorizontalAlignment="Left"
+                                      Margin="0,0,0,12"
+                                      SelectionChanged="OnBehaviorSelectionChanged"
+                                      AutomationProperties.AutomationId="SpecificMonitorCombo" />
+
+                            <CheckBox x:Name="ExpandOnHoverCheck"
+                                      Content="Expand island automatically on pointer hover"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,8"
+                                      Checked="OnBehaviorCheckChanged"
+                                      Unchecked="OnBehaviorCheckChanged" />
+
+                            <CheckBox x:Name="FullscreenBreakthroughCheck"
+                                      Content="Allow critical alerts to break through fullscreen detection"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,12"
+                                      Checked="OnBehaviorCheckChanged"
+                                      Unchecked="OnBehaviorCheckChanged" />
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Hover expand delay (ms)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <TextBox x:Name="HoverDelayBox" Grid.Column="1" Style="{StaticResource SettingsInputBoxStyle}" LostFocus="OnBehaviorTextLostFocus" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Auto-collapse delay (ms)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <TextBox x:Name="AutoCollapseDelayBox" Grid.Column="1" Style="{StaticResource SettingsInputBoxStyle}" LostFocus="OnBehaviorTextLostFocus" />
+                            </Grid>
+
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="Global toggle hotkey"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="12.5"
+                                           Foreground="{DynamicResource TextMuted}" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <TextBox x:Name="HotkeyBox"
+                                             Width="180"
+                                             Style="{StaticResource SettingsInputBoxStyle}"
+                                             Margin="0,0,8,0"
+                                             AutomationProperties.AutomationId="GlobalHotkeyInputBox" />
+                                    <Button Content="Save hotkey"
+                                            Style="{StaticResource SettingsPrimaryButtonStyle}"
+                                            Click="OnSaveHotkeyClicked" />
+                                </StackPanel>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Diagnostic Logs Card (FR-SYS-001) -->
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                <StackPanel DockPanel.Dock="Left">
+                                    <TextBlock Text="Diagnostic logs (sanitized)"
+                                               FontFamily="{DynamicResource ShimaFontFamily}"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" />
+                                    <TextBlock x:Name="LogDirectoryPathText"
+                                               FontFamily="{DynamicResource ShimaFontFamily}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextMuted}" />
+                                </StackPanel>
+
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Refresh"
+                                            Style="{StaticResource SettingsActionButtonStyle}"
+                                            Margin="0,0,6,0"
+                                            Click="OnRefreshLogsClicked" />
+                                    <Button Content="Clear logs"
+                                            Style="{StaticResource SettingsDangerButtonStyle}"
+                                            Margin="0,0,6,0"
+                                            Click="OnClearLogsClicked"
+                                            AutomationProperties.AutomationId="ClearLogsButton" />
+                                    <Button Content="Export bundle"
+                                            Style="{StaticResource SettingsPrimaryButtonStyle}"
+                                            Click="OnExportDiagnosticsClicked"
+                                            AutomationProperties.AutomationId="ExportDiagnosticsButton" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <TextBox x:Name="DiagnosticsLogViewer"
+                                     IsReadOnly="True"
+                                     TextWrapping="NoWrap"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     VerticalScrollBarVisibility="Auto"
+                                     Height="160"
+                                     Style="{StaticResource SettingsInputBoxStyle}"
+                                     FontFamily="Consolas"
+                                     FontSize="11.5" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 2. Widgets -->
+                <StackPanel x:Name="PanelWidgets" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Widgets" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Enable, disable, reorder, and reset individual Dynamic Island widget modules." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <ItemsControl x:Name="WidgetsItemsControl"
+                                          AutomationProperties.AutomationId="WidgetsConfigList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,0,0,10" LastChildFill="False">
+                                            <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                                           FontSize="13"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimary}" />
+                                                <TextBlock Text="{Binding StatusDescription}"
+                                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource TextMuted}" />
+                                            </StackPanel>
+
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                <Button Style="{StaticResource SettingsActionButtonStyle}"
+                                                        Content="Up"
+                                                        Tag="{Binding WidgetId}"
+                                                        IsEnabled="{Binding CanMoveUp}"
+                                                        Margin="0,0,6,0"
+                                                        Click="OnMoveWidgetUpClicked"
+                                                        AutomationProperties.Name="{Binding MoveUpLabel}" />
+                                                <Button Style="{StaticResource SettingsActionButtonStyle}"
+                                                        Content="Down"
+                                                        Tag="{Binding WidgetId}"
+                                                        IsEnabled="{Binding CanMoveDown}"
+                                                        Margin="0,0,6,0"
+                                                        Click="OnMoveWidgetDownClicked"
+                                                        AutomationProperties.Name="{Binding MoveDownLabel}" />
+                                                <Button Style="{StaticResource SettingsActionButtonStyle}"
+                                                        Content="{Binding ToggleActionLabel}"
+                                                        Tag="{Binding WidgetId}"
+                                                        Margin="0,0,6,0"
+                                                        Click="OnToggleWidgetClicked" />
+                                                <Button Style="{StaticResource SettingsActionButtonStyle}"
+                                                        Content="Reset"
+                                                        Tag="{Binding WidgetId}"
+                                                        Click="OnResetWidgetClicked" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock x:Name="NoWidgetsText"
+                                       Text="No widget modules registered in this session yet."
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 3. Notifications -->
+                <StackPanel x:Name="PanelNotifications" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Notifications" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Control notification dismissal sync with Windows Action Center, retention window, and per-app exclusions." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <CheckBox x:Name="SyncActionCenterCheck"
+                                      Content="Sync inbox dismissal with Windows Action Center"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,12"
+                                      Checked="OnBehaviorCheckChanged"
+                                      Unchecked="OnBehaviorCheckChanged" />
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Inbox retention (days)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <TextBox x:Name="InboxRetentionBox" Grid.Column="1" Style="{StaticResource SettingsInputBoxStyle}" LostFocus="OnBehaviorTextLostFocus" />
+                            </Grid>
+
+                            <TextBlock Text="Per-app notification exclusions (comma-separated app names or AUMIDs)"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,4" />
+                            <TextBox x:Name="NotificationExclusionsBox"
+                                     Style="{StaticResource SettingsInputBoxStyle}"
+                                     IsReadOnly="True"
+                                     Text="Managed by Notification Listener widget (available once Inbox initializes)" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 4. Clipboard -->
+                <StackPanel x:Name="PanelClipboard" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Clipboard" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Configure local encrypted clipboard history bounds and preference defaults." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Maximum stored clipboard items" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <TextBox x:Name="ClipboardMaxItemsBox" Grid.Column="1" Style="{StaticResource SettingsInputBoxStyle}" LostFocus="OnBehaviorTextLostFocus" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="220" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Clipboard retention (days)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <TextBox x:Name="ClipboardRetentionBox" Grid.Column="1" Style="{StaticResource SettingsInputBoxStyle}" LostFocus="OnBehaviorTextLostFocus" />
+                            </Grid>
+
+                            <Button HorizontalAlignment="Left"
+                                    Style="{StaticResource SettingsDangerButtonStyle}"
+                                    Content="Reset all preferences to defaults"
+                                    Click="OnResetPreferencesClicked" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 5. Focus Timer -->
+                <StackPanel x:Name="PanelFocusTimer" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Focus Timer" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Pomodoro focus cadence and Zen display dimming configuration." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Focus &amp; Zen display presets"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="13.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Margin="0,0,0,6" />
+                            <TextBlock TextWrapping="Wrap"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="Focus Timer defaults to 25-minute work sessions and 5-minute breaks. Hardware Zen display dimming includes automatic runtime crash recovery." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 6. Clock -->
+                <StackPanel x:Name="PanelClock" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Clock" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Local time format and world clock cities list." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="World clocks &amp; 12h/24h preferences"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="13.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Margin="0,0,0,6" />
+                            <TextBlock TextWrapping="Wrap"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="Pinned cities (Manila, London, New York, Tokyo) and 12h/24h toggle controls synchronize with the Clock widget database." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 7. Developer Integrations -->
+                <StackPanel x:Name="PanelDeveloperIntegrations" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Developer Integrations" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Opt-in local bridge integrations for Claude Code and OpenCode (loopback-first, DPAPI protected)." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <CheckBox x:Name="ClaudeCodeOptInCheck"
+                                      Content="Enable Claude Code local hook bridge (opt-in)"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,10"
+                                      Checked="OnDeveloperChanged"
+                                      Unchecked="OnDeveloperChanged"
+                                      AutomationProperties.AutomationId="ClaudeCodeOptInCheck" />
+
+                            <CheckBox x:Name="OpenCodeOptInCheck"
+                                      Content="Enable OpenCode local server tracking (opt-in)"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,12"
+                                      Checked="OnDeveloperChanged"
+                                      Unchecked="OnDeveloperChanged"
+                                      AutomationProperties.AutomationId="OpenCodeOptInCheck" />
+
+                            <TextBlock Text="OpenCode server endpoint URL (loopback http://localhost:* or http://127.0.0.1:*)"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,4" />
+                            <TextBox x:Name="OpenCodeEndpointBox"
+                                     Style="{StaticResource SettingsInputBoxStyle}"
+                                     Margin="0,0,0,6"
+                                     AutomationProperties.AutomationId="OpenCodeEndpointBox" />
+                            <TextBlock x:Name="OpenCodeUrlValidationText"
+                                       Margin="0,0,0,10"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource WarningBannerText}"
+                                       Visibility="Collapsed" />
+
+                            <TextBlock Text="OpenCode server password (stored DPAPI encrypted)"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,4" />
+                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Save developer settings"
+                                            Style="{StaticResource SettingsPrimaryButtonStyle}"
+                                            Margin="8,0,6,0"
+                                            Click="OnSaveDeveloperClicked"
+                                            AutomationProperties.AutomationId="SaveDeveloperSettingsButton" />
+                                    <Button x:Name="ClearOpenCodePasswordButton"
+                                            Content="Clear saved password"
+                                            Style="{StaticResource SettingsDangerButtonStyle}"
+                                            Click="OnClearOpenCodePasswordClicked"
+                                            AutomationProperties.AutomationId="ClearOpenCodePasswordButton" />
+                                </StackPanel>
+
+                                <PasswordBox x:Name="OpenCodePasswordBox"
+                                             Padding="8,6"
+                                             Background="{DynamicResource SurfaceSettingsInput}"
+                                             Foreground="{DynamicResource TextPrimary}"
+                                             BorderBrush="{DynamicResource SettingsBorderSubtle}"
+                                             BorderThickness="1"
+                                             AutomationProperties.Name="OpenCode server password"
+                                             AutomationProperties.AutomationId="OpenCodePasswordBox" />
+                            </DockPanel>
+
+                            <TextBlock x:Name="OpenCodePasswordStateText"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="No password saved"
+                                       AutomationProperties.AutomationId="OpenCodePasswordStateText" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 8. Appearance & Customization -->
+                <StackPanel x:Name="PanelAppearance" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Appearance &amp; Customization" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Customize surface themes, color slots with live Dynamic Island preview, per-widget accents, and custom presets." />
+
+                    <!-- Live Miniature Island Preview Card -->
+                    <Border Style="{StaticResource SettingsCardStyle}"
+                            AutomationProperties.Name="Live miniature island preview card"
+                            AutomationProperties.AutomationId="MiniIslandPreviewCard">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="Live island preview"
+                                       HorizontalAlignment="Center"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,8" />
+
+                            <Border x:Name="MiniIslandPreviewSurface"
+                                    Width="320"
+                                    Height="84"
+                                    CornerRadius="18"
+                                    Padding="16,12"
+                                    Background="{DynamicResource SurfaceExpanded}"
+                                    BorderBrush="{DynamicResource BorderHairline}"
+                                    BorderThickness="{DynamicResource IslandBorderThickness}">
+                                <DockPanel LastChildFill="True">
+                                    <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                        <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentBrush}" Margin="0,0,0,4" />
+                                        <Ellipse Width="6" Height="6" Fill="{DynamicResource TextMuted}" Opacity="0.45" Margin="0,0,0,4" />
+                                        <Ellipse Width="6" Height="6" Fill="{DynamicResource TextMuted}" Opacity="0.45" />
+                                    </StackPanel>
+
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Saturday, November 21"
+                                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextMuted}" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <TextBlock Text="9:15 PM"
+                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                       FontSize="22"
+                                                       FontWeight="Light"
+                                                       Foreground="{DynamicResource TextPrimary}" />
+                                            <Border Width="8"
+                                                    Height="8"
+                                                    CornerRadius="4"
+                                                    VerticalAlignment="Center"
+                                                    Margin="10,0,0,0"
+                                                    Background="{DynamicResource AccentBrush}" />
+                                        </StackPanel>
+                                        <TextBlock Text="Manila · UTC+8"
+                                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextMuted}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Non-blocking Contrast Summary Banner -->
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <DockPanel LastChildFill="True">
+                            <TextBlock x:Name="AppearanceContrastBadgeText"
+                                       DockPanel.Dock="Right"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Text="Contrast audit: Pass" />
+                            <StackPanel>
+                                <TextBlock Text="Accessibility contrast status"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="13.5"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}" />
+                                <TextBlock x:Name="AppearanceContrastDetailText"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           Text="Text >= 4.5:1 and secondary icons/accents >= 3.0:1 against active surfaces." />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Presets Card -->
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="Theme presets"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Duplicate active"
+                                            Style="{StaticResource SettingsActionButtonStyle}"
+                                            Margin="0,0,6,0"
+                                            Click="OnDuplicatePresetClicked"
+                                            AutomationProperties.AutomationId="DuplicatePresetButton" />
+                                    <Button Content="Save as custom preset"
+                                            Style="{StaticResource SettingsActionButtonStyle}"
+                                            Click="OnSaveNewPresetClicked"
+                                            AutomationProperties.AutomationId="SaveCustomPresetButton" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <ItemsControl x:Name="PresetsItemsControl"
+                                          AutomationProperties.AutomationId="AppearancePresetsList">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Margin="0,0,8,8"
+                                                Style="{StaticResource SettingsActionButtonStyle}"
+                                                Click="OnPresetTileClicked"
+                                                Tag="{Binding Id}"
+                                                AutomationProperties.Name="{Binding ActionLabel}"
+                                                AutomationProperties.AutomationId="{Binding AutomationId}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="12"
+                                                         Height="12"
+                                                         Margin="0,0,8,0"
+                                                         Fill="{Binding BackgroundSwatch}"
+                                                         Stroke="{Binding AccentSwatch}"
+                                                         StrokeThickness="2" />
+                                                <TextBlock Text="{Binding DisplayLabel}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Custom preset management -->
+                            <StackPanel x:Name="CustomPresetActionsPanel"
+                                        Orientation="Horizontal"
+                                        Margin="0,8,0,0"
+                                        Visibility="Collapsed">
+                                <TextBox x:Name="CustomPresetRenameBox"
+                                         Width="180"
+                                         Style="{StaticResource SettingsInputBoxStyle}"
+                                         Margin="0,0,8,0"
+                                         AutomationProperties.Name="Custom preset name"
+                                         AutomationProperties.AutomationId="CustomPresetRenameBox" />
+                                <Button Content="Rename preset"
+                                        Style="{StaticResource SettingsActionButtonStyle}"
+                                        Margin="0,0,8,0"
+                                        Click="OnRenameCustomPresetClicked"
+                                        AutomationProperties.AutomationId="RenameCustomPresetButton" />
+                                <Button Content="Delete preset"
+                                        Style="{StaticResource SettingsDangerButtonStyle}"
+                                        Click="OnDeleteCustomPresetClicked"
+                                        AutomationProperties.AutomationId="DeleteCustomPresetButton" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Palette Linking, Glow/Border, and 6 Token Slots -->
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <CheckBox x:Name="LinkCollapsedExpandedCheck"
+                                      Content="Link collapsed and expanded surface tokens"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,8"
+                                      Checked="OnLinkBackgroundsChanged"
+                                      Unchecked="OnLinkBackgroundsChanged"
+                                      AutomationProperties.AutomationId="LinkBackgroundsCheck" />
+
+                            <CheckBox x:Name="UsePerWidgetAccentsCheck"
+                                      Content="Enable per-widget accent color overrides"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Margin="0,0,0,10"
+                                      Checked="OnPerWidgetAccentsChanged"
+                                      Unchecked="OnPerWidgetAccentsChanged"
+                                      AutomationProperties.AutomationId="UsePerWidgetAccentsCheck" />
+
+                            <StackPanel x:Name="TargetSurfaceSelectorPanel"
+                                        Orientation="Horizontal"
+                                        Margin="0,0,0,10"
+                                        Visibility="Collapsed">
+                                <TextBlock Text="Editing target surface:"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,10,0"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextMuted}" />
+                                <RadioButton x:Name="EditCollapsedSurfaceRadio"
+                                             Content="Collapsed"
+                                             GroupName="EditSurfaceTarget"
+                                             Foreground="{DynamicResource TextPrimary}"
+                                             Margin="0,0,10,0"
+                                             Checked="OnTargetSurfaceChanged" />
+                                <RadioButton x:Name="EditExpandedSurfaceRadio"
+                                             Content="Expanded"
+                                             GroupName="EditSurfaceTarget"
+                                             Foreground="{DynamicResource TextPrimary}"
+                                             IsChecked="True"
+                                             Checked="OnTargetSurfaceChanged" />
+                            </StackPanel>
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="80" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Glow opacity (0.0 - 1.0)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <Slider x:Name="GlowOpacitySlider"
+                                        Grid.Column="1"
+                                        Minimum="0.0"
+                                        Maximum="1.0"
+                                        TickFrequency="0.05"
+                                        IsSnapToTickEnabled="True"
+                                        VerticalAlignment="Center"
+                                        ValueChanged="OnGlowOpacityChanged" />
+                                <TextBlock Grid.Column="3" Text="Border thickness (DIP)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                                <TextBox x:Name="BorderThicknessBox"
+                                         Grid.Column="4"
+                                         Style="{StaticResource SettingsInputBoxStyle}"
+                                         LostFocus="OnBorderThicknessLostFocus" />
+                            </Grid>
+
+                            <ItemsControl x:Name="PaletteSlotsItemsControl"
+                                          AutomationProperties.AutomationId="PaletteSlotsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,0,0,8" LastChildFill="False">
+                                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="22"
+                                                        Height="22"
+                                                        CornerRadius="6"
+                                                        Margin="0,0,10,0"
+                                                        Background="{Binding SwatchBrush}"
+                                                        BorderBrush="{DynamicResource SettingsBorderSubtle}"
+                                                        BorderThickness="1" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontFamily="{DynamicResource ShimaFontFamily}"
+                                                               FontSize="12.5"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimary}" />
+                                                    <TextBlock Text="{Binding HexValue}"
+                                                               FontFamily="{DynamicResource ShimaFontFamily}"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource TextMuted}" />
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <Button DockPanel.Dock="Right"
+                                                    Style="{StaticResource SettingsActionButtonStyle}"
+                                                    Content="Edit color"
+                                                    Tag="{Binding Slot}"
+                                                    Click="OnEditPaletteSlotClicked"
+                                                    AutomationProperties.Name="{Binding EditActionName}"
+                                                    AutomationProperties.AutomationId="{Binding EditButtonAutomationId}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <DockPanel Margin="0,8,0,0" LastChildFill="False">
+                                <Button DockPanel.Dock="Left"
+                                        x:Name="ResetAllAppearanceButton"
+                                        Style="{StaticResource SettingsDangerButtonStyle}"
+                                        Content="Reset all appearance to Midnight"
+                                        Click="OnResetAllAppearanceClicked"
+                                        AutomationProperties.AutomationId="ResetAllAppearanceButton" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 9. Updates -->
+                <StackPanel x:Name="PanelUpdates" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Updates" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Configure strictly offline mode and local update package checks." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <CheckBox x:Name="UpdatesOfflineModeCheck"
+                                      Content="Keep Shima strictly offline (disable update network checks)"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Checked="OnBehaviorCheckChanged"
+                                      Unchecked="OnBehaviorCheckChanged" />
+                            <TextBlock Margin="22,6,0,0"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="Installed runtime version: 0.1.0 (local-first desktop shell)" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 10. License -->
+                <StackPanel x:Name="PanelLicense" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="License" />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Manage optional DPAPI-protected offline license state and product metadata." />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="License key (stored DPAPI encrypted)"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,4" />
+
+                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Save license key"
+                                            Style="{StaticResource SettingsPrimaryButtonStyle}"
+                                            Margin="8,0,6,0"
+                                            Click="OnSaveLicenseClicked"
+                                            AutomationProperties.AutomationId="SaveLicenseKeyButton" />
+                                    <Button x:Name="ClearLicenseKeyButton"
+                                            Content="Clear license key"
+                                            Style="{StaticResource SettingsDangerButtonStyle}"
+                                            Click="OnClearLicenseClicked"
+                                            AutomationProperties.AutomationId="ClearLicenseKeyButton" />
+                                </StackPanel>
+
+                                <PasswordBox x:Name="LicenseKeyBox"
+                                             Padding="8,6"
+                                             Background="{DynamicResource SurfaceSettingsInput}"
+                                             Foreground="{DynamicResource TextPrimary}"
+                                             BorderBrush="{DynamicResource SettingsBorderSubtle}"
+                                             BorderThickness="1"
+                                             AutomationProperties.Name="License key input"
+                                             AutomationProperties.AutomationId="LicenseKeyBox" />
+                            </DockPanel>
+
+                            <TextBlock x:Name="LicenseStateText"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="Community offline edition — no license key stored"
+                                       AutomationProperties.AutomationId="LicenseStateText" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
