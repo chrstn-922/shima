@@ -2,3 +2,20 @@
 .specify/**/local-config.yml
 .specify/**/*-config.local.yml
 .specify/workflows/runs/
+
+# .NET / C# build outputs
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+packages/
+TestResults/
+artifacts/
+*.nupkg
+*.snupkg
+*.msix
+*.appx
+*.cer
+*.pfx

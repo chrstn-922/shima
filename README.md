@@ -2,7 +2,7 @@
 
 Shima is a Windows Dynamic Island desktop companion. It sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
 
-**Status: blueprint complete, implementation not started.** The specification, research, architecture plan, data model, contracts, and task breakdown are committed. There is no `Shima.sln`, no `src/`, and no `tests/` yet, so nothing builds or runs at the moment.
+**Status: Phase 1 scaffold in place (T001–T004 done).** The blueprint is complete and committed: spec, research, architecture plan, data model, contracts, and task breakdown. `Shima.sln` builds an empty 5-layer solution with all widget projects, DI wiring, and smoke-test projects. No widget, shell, or adapter code exists yet.
 
 ## Features
 
@@ -67,17 +67,17 @@ dotnet --info                             # expect an 8.0.x SDK
 & ".specify/scripts/powershell/check-prerequisites.ps1" -Json
 ```
 
-Build and test commands are documented in [quickstart.md](specs/001-shima-dynamic-island/quickstart.md#3-planned-build--automated-test-commands-execution-phase) but do not work yet — the solution and projects have to be scaffolded first (T002–T004).
+Build and test commands are documented in [quickstart.md](specs/001-shima-dynamic-island/quickstart.md#3-planned-build--automated-test-commands-execution-phase). The solution exists, so they are runnable now, but there is nothing to exercise beyond scaffold smoke tests.
 
 ## Roadmap
 
-Nothing below is implemented. Order and milestones come from [development-roadmap.md](docs/blueprint/development-roadmap.md) and [tasks.md](specs/001-shima-dynamic-island/tasks.md).
+Nothing past Phase 1 is implemented. Order and milestones come from [development-roadmap.md](docs/blueprint/development-roadmap.md) and [tasks.md](specs/001-shima-dynamic-island/tasks.md).
 
 | Phase | Tasks | Milestone | Status |
 | :--- | :--- | :--- | :--- |
 | Blueprint: spec, research, plan, data model, contracts, docs | — | — | Done |
-| 1. Solution scaffolding + Phase 0 API spikes | T001–T004 | M0 | Not started |
-| 2. Core contracts, SQLite, config, widget registry | T005–T010 | M0/M1 | Not started |
+| 1. Solution scaffolding + Phase 0 API spikes | T001–T004 | M0 | Done |
+| 2. Core contracts, SQLite, config, widget registry | T005–T010 | M0/M1 | Next |
 | 3. Island shell (states, DPI, fullscreen, pinning) | T011–T018 | M1 | Not started |
 | 4. Settings + Advanced Color Picker + appearance | T019–T028 | M2 | Not started |
 | 5. Clock widget | T029–T032 | M3 | Not started |
@@ -87,4 +87,4 @@ Nothing below is implemented. Order and milestones come from [development-roadma
 | 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Not started |
 | 10. Packaging, signing, release verification | T054–T056 | M6 | Not started |
 
-Next step: T001 (API validation spikes) and T002 (create `Shima.sln` and the layer projects).
+Next step: Phase 2, starting with T005 (core contracts) and T006–T009 (SQLite, atomic config, widget registry).

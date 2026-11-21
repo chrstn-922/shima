@@ -16,10 +16,10 @@
 
 **Purpose**: Validate Windows OS API assumptions and initialize the 5-layer .NET 8 solution structure without circular dependencies.
 
-- [ ] T001 Run Phase 0 API validation spikes (borderless fullscreen detection, `MagSetFullscreenColorEffect` multi-monitor/HDR, Sparse MSIX `UserNotificationListener` identity) and record results in `specs/001-shima-dynamic-island/research.md`
-- [ ] T002 Create `Shima.sln` and modular projects (`src/Shima.Core/`, `src/Shima.WindowsInterop/`, `src/Shima.Infrastructure/`, `src/Shima.Presentation/`, `src/Shima.App/`, `src/Shima.AgentBridge/`, and `src/Shima.Widgets/*`) per `specs/001-shima-dynamic-island/plan.md`
-- [ ] T003 [P] Configure `Directory.Build.props`, `net8.0-windows10.0.22621.0` target, nullable reference types, `PerMonitorV2` `src/Shima.App/app.manifest`, and `CsWin32` `NativeMethods.txt` in `src/Shima.WindowsInterop/`
-- [ ] T004 [P] Create test projects (`tests/Shima.Core.Tests/`, `tests/Shima.Infrastructure.Tests/`, `tests/Shima.WindowsInterop.Tests/`, `tests/Shima.Widgets.Tests/`, `tests/Shima.UI.Tests/`) with `xUnit`, `FluentAssertions`, and `NSubstitute`
+- [X] T001 Run Phase 0 API validation spikes (borderless fullscreen detection, `MagSetFullscreenColorEffect` multi-monitor/HDR, Sparse MSIX `UserNotificationListener` identity) and record results in `specs/001-shima-dynamic-island/research.md`
+- [X] T002 Create `Shima.sln` and modular projects (`src/Shima.Core/`, `src/Shima.WindowsInterop/`, `src/Shima.Infrastructure/`, `src/Shima.Presentation/`, `src/Shima.App/`, `src/Shima.AgentBridge/`, and `src/Shima.Widgets/*`) per `specs/001-shima-dynamic-island/plan.md`
+- [X] T003 [P] Configure `Directory.Build.props`, `net8.0-windows10.0.22621.0` target, nullable reference types, `PerMonitorV2` `src/Shima.App/app.manifest`, and `CsWin32` `NativeMethods.txt` in `src/Shima.WindowsInterop/`
+- [X] T004 [P] Create test projects (`tests/Shima.Core.Tests/`, `tests/Shima.Infrastructure.Tests/`, `tests/Shima.WindowsInterop.Tests/`, `tests/Shima.Widgets.Tests/`, `tests/Shima.UI.Tests/`) with `xUnit`, `FluentAssertions`, and `NSubstitute`
 
 ---
 

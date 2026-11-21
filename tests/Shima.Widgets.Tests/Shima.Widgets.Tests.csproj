@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Shima.Core\Shima.Core.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.Clock\Shima.Widgets.Clock.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.NowPlaying\Shima.Widgets.NowPlaying.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.FocusTimer\Shima.Widgets.FocusTimer.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.Notes\Shima.Widgets.Notes.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.Inbox\Shima.Widgets.Inbox.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.Clipboard\Shima.Widgets.Clipboard.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.VolumeMixer\Shima.Widgets.VolumeMixer.csproj" />
+    <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.Developer\Shima.Widgets.Developer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
