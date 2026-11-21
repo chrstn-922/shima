@@ -235,7 +235,7 @@ erDiagram
 ### 4.3 `settings.json` (`AppPreferences`)
 
 Includes:
-- `schemaVersion` (`int`), `startWithWindows` (`bool`), `targetMonitorMode` (`Primary | ActiveCursor | SpecificMonitorId`), `specificMonitorDeviceId` (`string?`), `expandOnHover` (`bool`), `hoverExpandDelayMs` (`100..1500`, default `350`), `autoCollapseDelayMs` (`200..3000`, default `450`), `globalToggleHotkey` (`KeyGesture`), `fullscreenBreakthroughAlerts` (`bool`, default `false` per `FR-SHELL-007`), `syncInboxDismissalWithActionCenter` (`bool`, default `true` per `FR-INBOX-003`), `clipboardMaxItems` (`20..1000`, default `100`), `clipboardRetentionDays` (`1..365`, default `30`), `inboxRetentionDays` (`1..90`, default `14`), `claudeCodeOptInEnabled` (`bool`), `openCodeOptInEnabled` (`bool`), `openCodeEndpointUrl` (`string`, validated `http://localhost:*` or `http://127.0.0.1:*`), `updatesOfflineMode` (`bool`, default `false`), `licenseState` (`dpapiEncryptedBlob?`).
+- `schemaVersion` (`int`), `startWithWindows` (`bool`), `targetMonitorMode` (`Primary | ActiveCursor | SpecificMonitorId`), `specificMonitorDeviceId` (`string?`), `expandOnHover` (`bool`), `hoverExpandDelayMs` (`100..1500`, default `350`), `autoCollapseDelayMs` (`200..3000`, default `450`), `globalToggleHotkey` (`KeyGesture`), `fullscreenBreakthroughAlerts` (`bool`, default `false` per `FR-SHELL-007`), `syncInboxDismissalWithActionCenter` (`bool`, default `true` per `FR-INBOX-003`), `clipboardMaxItems` (`20..1000`, default `100`), `clipboardRetentionDays` (`1..365`, default `30`), `inboxRetentionDays` (`1..90`, default `14`), `claudeCodeOptInEnabled` (`bool`), `openCodeOptInEnabled` (`bool`), `openCodeEndpointUrl` (`string`, validated `http://localhost:*` or `http://127.0.0.1:*`), `openCodeServerPassword` (`dpapiEncryptedBlob?`, optional `DataProtectionScope.CurrentUser` password for authenticated `opencode serve` loopback endpoints; `null` when unauthenticated; never serialized in plaintext or logged), `updatesOfflineMode` (`bool`, default `false`), `licenseState` (`dpapiEncryptedBlob?`).
 
 ---
 
@@ -245,7 +245,7 @@ Includes:
 - **Retention Policies**:
   - **Clipboard**: Prunes unpinned entries older than `clipboardRetentionDays` or exceeding `clipboardMaxItems` on startup and after every 25th insertion (deleting associated image files in `cache\clip\`). Pinned items are exempt.
   - **Inbox**: Prunes notifications older than `inboxRetentionDays` and caps total stored items at `500`.
-  - **Agent Session Logs**: Keeps active sessions + last `50` finished sessions.
+  - **Agent Session Logs**: Active UI collapsed bar holds `Finished` for `10s` (or until hovered/opened) and holds `Error / Failed` until hovered/dismissed (`15m` max auto-expiry), suspending timers once `Idle`; expanded multi-session list retains finished/errored rows for `15m` (or until dismissed); SQLite `agent_session_logs` keeps active sessions + last `50` finished sessions.
 - **Migration Strategy (Surviving App Updates & Restarts)**:
   - `%LOCALAPPDATA%\Shima\` resides outside the Velopack/application binary directory (`%LOCALAPPDATA%\Shima\app-*`), guaranteeing user configs, notes, and custom presets are untouched during updates or binary swaps.
   - On startup, `MigrationRunner` runs forward-only additive SQLite migrations inside a single transaction (`BEGIN IMMEDIATE ... COMMIT`) and upgrades JSON `schemaVersion` via backward-compatible property defaults (`System.Text.Json` never deletes unknown forward fields during downgrade safety).
