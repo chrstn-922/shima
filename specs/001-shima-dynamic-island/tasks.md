@@ -114,14 +114,14 @@
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] Write unit/contract tests for `MediaSessionAdapter` (missing artwork/seek fallback) and `AudioMixerAdapter` (session churn 150ms debounce, device switch) in `tests/Shima.WindowsInterop.Tests/MediaAndAudioTests.cs`
+- [X] T033 [P] [US3] Write unit/contract tests for `MediaSessionAdapter` (missing artwork/seek fallback) and `AudioMixerAdapter` (session churn 150ms debounce, device switch) in `tests/Shima.WindowsInterop.Tests/MediaAndAudioTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T034 [P] [US3] Implement `MediaSessionAdapter` (WinRT `GSMTC` events, `IsPlaybackPositionEnabled` guard, thumbnail stream decoding) in `src/Shima.WindowsInterop/Media/MediaSessionAdapter.cs`
-- [ ] T035 [P] [US3] Implement `AudioMixerAdapter` using `NAudio.Wasapi` CoreAudio wrappers (MTA COM `IAudioSessionManager2`, `ISimpleAudioVolume`, `IMMNotificationClient`, app icon resolver) in `src/Shima.WindowsInterop/Audio/AudioMixerAdapter.cs`
-- [ ] T036 [US3] Implement `NowPlayingWidgetModule` (`shima.music`, including compact `Active` pill badge & expanded view) in `src/Shima.Widgets/Shima.Widgets.NowPlaying/`
-- [ ] T037 [US3] Implement `VolumeMixerWidgetModule` (`shima.mixer`, master output + per-app sliders & mute toggles) in `src/Shima.Widgets/Shima.Widgets.VolumeMixer/`
+- [X] T034 [P] [US3] Implement `MediaSessionAdapter` (WinRT `GSMTC` events, `IsPlaybackPositionEnabled` guard, thumbnail stream decoding) in `src/Shima.WindowsInterop/Media/MediaSessionAdapter.cs`
+- [X] T035 [P] [US3] Implement `AudioMixerAdapter` using `NAudio.Wasapi` CoreAudio wrappers (MTA COM `IAudioSessionManager2`, `ISimpleAudioVolume`, `IMMNotificationClient`, app icon resolver) in `src/Shima.WindowsInterop/Audio/AudioMixerAdapter.cs`
+- [X] T036 [US3] Implement `NowPlayingWidgetModule` (`shima.music`, including compact `Active` pill badge & expanded view) in `src/Shima.Widgets/Shima.Widgets.NowPlaying/`
+- [X] T037 [US3] Implement `VolumeMixerWidgetModule` (`shima.mixer`, master output + per-app sliders & mute toggles) in `src/Shima.Widgets/Shima.Widgets.VolumeMixer/`
 
 ---
 

@@ -37,6 +37,8 @@ public interface IIslandAttentionRequester
     void RequestPeekNotification(NotificationPriority priority, TimeSpan ttl);
 
     void UpdateCompactPill(string? badgeText);
+
+    void UpdateCompactPill(string? widgetId, string? badgeText) => UpdateCompactPill(badgeText);
 }
 
 public interface IThemeTokenProvider

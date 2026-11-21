@@ -487,6 +487,7 @@ public sealed class WidgetRegistry : IAsyncDisposable
 
         if (instance is null)
         {
+            _island.UpdateCompactPill(entry.WidgetId, null);
             return;
         }
 
@@ -497,6 +498,10 @@ public sealed class WidgetRegistry : IAsyncDisposable
         catch (Exception exception)
         {
             _logger.Warn($"Widget '{entry.WidgetId}' failed during disposal.", exception);
+        }
+        finally
+        {
+            _island.UpdateCompactPill(entry.WidgetId, null);
         }
     }
 
@@ -576,7 +581,7 @@ public sealed class WidgetRegistry : IAsyncDisposable
             Events = events;
             Settings = new WidgetSettingsStore(registry, entry);
             Theme = theme;
-            Island = island;
+            Island = new ScopedIslandAttentionRequester(entry.WidgetId, island);
             Logger = logger;
         }
 
@@ -591,6 +596,19 @@ public sealed class WidgetRegistry : IAsyncDisposable
         public IThemeTokenProvider Theme { get; }
 
         public ILogger Logger { get; }
+    }
+
+    private sealed class ScopedIslandAttentionRequester(string widgetId, IIslandAttentionRequester inner)
+        : IIslandAttentionRequester
+    {
+        public void RequestPeekNotification(NotificationPriority priority, TimeSpan ttl) =>
+            inner.RequestPeekNotification(priority, ttl);
+
+        public void UpdateCompactPill(string? badgeText) =>
+            inner.UpdateCompactPill(widgetId, badgeText);
+
+        public void UpdateCompactPill(string? targetWidgetId, string? badgeText) =>
+            inner.UpdateCompactPill(targetWidgetId ?? widgetId, badgeText);
     }
 
     private sealed class WidgetSettingsStore : IWidgetSettingsStore

@@ -75,6 +75,7 @@ public partial class IslandWindow : Window
         _notificationPeekTimer = CreateOneShotTimer(TimeSpan.FromSeconds(5), OnNotificationPeekTimerTick);
 
         _stateManager.StateChanged += OnShellStateChanged;
+        _stateManager.CompactPillUpdated += OnCompactPillUpdated;
         _displayTopologyMonitor.MonitorChanged += OnMonitorChanged;
         _displayTopologyMonitor.DpiChanged += OnDpiChanged;
         _fullscreenDetector.FullscreenStateChanged += OnFullscreenStateChanged;
@@ -92,6 +93,19 @@ public partial class IslandWindow : Window
 
     public void SetWidgetSlots(IReadOnlyList<WidgetSlotItem> slots, string? selectedWidgetId = null) =>
         WidgetHostControl.SetSlots(slots, selectedWidgetId);
+
+    public void SetCompactActiveContent(object? content)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => SetCompactActiveContent(content));
+            return;
+        }
+
+        ActiveCustomContentPresenter.Content = content;
+        ActiveCustomContentPresenter.Visibility = content is not null ? Visibility.Visible : Visibility.Collapsed;
+        ActiveDefaultBadgePanel.Visibility = content is null ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     public void SetNotificationContent(string title, string body)
     {
@@ -173,6 +187,7 @@ public partial class IslandWindow : Window
         StopAllTransientTimers();
 
         _stateManager.StateChanged -= OnShellStateChanged;
+        _stateManager.CompactPillUpdated -= OnCompactPillUpdated;
         _displayTopologyMonitor.MonitorChanged -= OnMonitorChanged;
         _displayTopologyMonitor.DpiChanged -= OnDpiChanged;
         _fullscreenDetector.FullscreenStateChanged -= OnFullscreenStateChanged;
@@ -205,6 +220,23 @@ public partial class IslandWindow : Window
         else
         {
             Dispatcher.BeginInvoke(() => ApplyVisualState(e.NewState, immediate: false));
+        }
+    }
+
+    private void OnCompactPillUpdated(object? sender, EventArgs e)
+    {
+        void SyncBadge()
+        {
+            ActiveBadgeText.Text = _stateManager.CompactPillBadgeText ?? "Active";
+        }
+
+        if (Dispatcher.CheckAccess())
+        {
+            SyncBadge();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(SyncBadge);
         }
     }
 

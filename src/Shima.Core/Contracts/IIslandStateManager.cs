@@ -32,9 +32,13 @@ public interface IIslandStateManager
 
     string? CompactPillBadgeText { get; }
 
+    string? CompactActiveWidgetId { get; }
+
     TimeSpan CurrentNotificationTtl { get; }
 
     event EventHandler<IslandStateChangedEventArgs>? StateChanged;
+
+    event EventHandler? CompactPillUpdated;
 
     Task TransitionToAsync(IslandShellState newState, CancellationToken ct = default);
 
@@ -43,6 +47,8 @@ public interface IIslandStateManager
     void SetFullscreenOnHostMonitor(bool isFullscreen);
 
     void SetCompactActive(bool isActive, string? badgeText = null);
+
+    void SetCompactActive(string? widgetId, bool isActive, string? badgeText = null);
 
     void RequestNotificationPeek(NotificationPriority priority, TimeSpan ttl);
 

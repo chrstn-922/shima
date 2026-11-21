@@ -27,6 +27,7 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
     private bool _isCompactActive;
     private bool _isInputFocusActive;
     private string? _compactPillBadgeText;
+    private string? _compactActiveWidgetId;
     private TimeSpan _currentNotificationTtl = DefaultNotificationTtl;
     private bool _disposed;
 
@@ -130,6 +131,17 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
         }
     }
 
+    public string? CompactActiveWidgetId
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _compactActiveWidgetId;
+            }
+        }
+    }
+
     public TimeSpan CurrentNotificationTtl
     {
         get
@@ -142,6 +154,8 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
     }
 
     public event EventHandler<IslandStateChangedEventArgs>? StateChanged;
+
+    public event EventHandler? CompactPillUpdated;
 
     public Task TransitionToAsync(IslandShellState newState, CancellationToken ct = default)
     {
@@ -222,17 +236,43 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
         RaiseStateChanged(change);
     }
 
-    public void SetCompactActive(bool isActive, string? badgeText = null)
+    public void SetCompactActive(bool isActive, string? badgeText = null) =>
+        SetCompactActive(null, isActive, badgeText);
+
+    public void SetCompactActive(string? widgetId, bool isActive, string? badgeText = null)
     {
         IslandStateChangedEventArgs? change;
+        bool pillChanged;
         lock (_sync)
         {
+            if (!isActive
+                && !string.IsNullOrWhiteSpace(widgetId)
+                && !string.IsNullOrWhiteSpace(_compactActiveWidgetId)
+                && !string.Equals(_compactActiveWidgetId, widgetId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var prevActive = _isCompactActive;
+            var prevBadge = _compactPillBadgeText;
+            var prevWidgetId = _compactActiveWidgetId;
+
             _isCompactActive = isActive;
             _compactPillBadgeText = isActive ? badgeText : null;
+            _compactActiveWidgetId = isActive ? widgetId : null;
+
+            pillChanged = prevActive != _isCompactActive
+                || !string.Equals(prevBadge, _compactPillBadgeText, StringComparison.Ordinal)
+                || !string.Equals(prevWidgetId, _compactActiveWidgetId, StringComparison.Ordinal);
+
             ReevaluateCore(out change);
         }
 
         RaiseStateChanged(change);
+        if (pillChanged)
+        {
+            CompactPillUpdated?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     public void RequestNotificationPeek(NotificationPriority priority, TimeSpan ttl)

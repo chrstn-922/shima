@@ -81,7 +81,8 @@
         <Grid x:Name="ActiveLayer"
               Margin="18,4,18,4"
               Visibility="Collapsed">
-            <StackPanel Orientation="Horizontal"
+            <StackPanel x:Name="ActiveDefaultBadgePanel"
+                        Orientation="Horizontal"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Center">
                 <Ellipse Width="6"
@@ -96,6 +97,9 @@
                            TextTrimming="CharacterEllipsis"
                            AutomationProperties.Name="Active pill status" />
             </StackPanel>
+
+            <ContentPresenter x:Name="ActiveCustomContentPresenter"
+                              Visibility="Collapsed" />
         </Grid>
 
         <!-- Notification peek layer -->

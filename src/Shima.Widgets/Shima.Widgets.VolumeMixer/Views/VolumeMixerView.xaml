@@ -1,0 +1,315 @@
+<UserControl x:Class="Shima.Widgets.VolumeMixer.Views.VolumeMixerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="{Binding AccessibleStatus}"
+             AutomationProperties.AutomationId="VolumeMixerWidgetView">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="MuteIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Background" Value="{DynamicResource SurfacePillButton}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MixerVolumeSliderStyle" TargetType="Slider">
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="SmallChange" Value="2" />
+            <Setter Property="LargeChange" Value="10" />
+            <Setter Property="IsMoveToPointEnabled" Value="True" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="18" Background="Transparent">
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4"
+                                                        CornerRadius="2"
+                                                        Background="{DynamicResource AccentBrush}" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4"
+                                                        CornerRadius="2"
+                                                        Background="{DynamicResource AgentStatusTrackBrush}" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="10" Height="10">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="{DynamicResource TextPrimary}"
+                                                         Stroke="{DynamicResource AccentBrush}"
+                                                         StrokeThickness="1.5" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Master System Output Header -->
+        <Border Grid.Row="0"
+                BorderBrush="{DynamicResource BorderHairline}"
+                BorderThickness="0,0,0,1"
+                Padding="0,0,0,8"
+                Margin="0,0,0,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="116" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="34" />
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="MasterMuteButton"
+                        Grid.Column="0"
+                        Style="{StaticResource MuteIconButtonStyle}"
+                        Click="OnMasterMuteClicked"
+                        ToolTip="{Binding MasterMuteActionLabel}"
+                        AutomationProperties.Name="{Binding MasterMuteActionLabel}"
+                        AutomationProperties.AutomationId="VolumeMixerMasterMuteButton">
+                    <Grid Width="13" Height="13">
+                        <Path Data="M1,4.5 H3.8 L7.5,1.5 V11.5 L3.8,8.5 H1 Z M9.5,3.5 C10.8,4.9 10.8,8.1 9.5,9.5"
+                              Stroke="{DynamicResource TextPrimary}"
+                              StrokeThickness="1.3"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Fill="Transparent">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMasterMuted}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                        <Path Data="M1,4.5 H3.8 L7.5,1.5 V11.5 L3.8,8.5 H1 Z M9,4 L12,9 M12,4 L9,9"
+                              Stroke="{DynamicResource AgentStatusErrorBrush}"
+                              StrokeThickness="1.3"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              Fill="Transparent"
+                              Visibility="{Binding IsMasterMuted, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
+                </Button>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="Master Output"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
+                    <TextBlock Text="{Binding DeviceName}"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="10.5"
+                               Foreground="{DynamicResource TextMuted}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <Slider x:Name="MasterVolumeSlider"
+                        Grid.Column="4"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource MixerVolumeSliderStyle}"
+                        Value="{Binding MasterVolumePercent, Mode=OneWay}"
+                        IsEnabled="{Binding IsAvailable}"
+                        PreviewMouseLeftButtonDown="OnMasterSliderMouseDown"
+                        PreviewMouseLeftButtonUp="OnMasterSliderMouseUp"
+                        LostMouseCapture="OnMasterSliderLostCapture"
+                        ValueChanged="OnMasterSliderValueChanged"
+                        AutomationProperties.Name="Adjust master output volume"
+                        AutomationProperties.AutomationId="VolumeMixerMasterSlider" />
+
+                <TextBlock Grid.Column="6"
+                           Text="{Binding MasterVolumePercentLabel}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource TextMuted}" />
+            </Grid>
+        </Border>
+
+        <!-- Per-Application Audio Streams -->
+        <Grid Grid.Row="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding HasSessions, Converter={StaticResource BoolToVis}}">
+                <ItemsControl x:Name="SessionsItemsControl"
+                              ItemsSource="{Binding Sessions}"
+                              AutomationProperties.Name="Active application volume streams"
+                              AutomationProperties.AutomationId="VolumeMixerSessionsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2,0,4"
+                                  AutomationProperties.Name="{Binding AccessibleState}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="116" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="30" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="24" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- App Icon or Clean Vector Fallback -->
+                                <Border Grid.Column="0"
+                                        Width="20"
+                                        Height="20"
+                                        CornerRadius="5"
+                                        Background="{DynamicResource SurfaceElevated}"
+                                        ClipToBounds="True"
+                                        VerticalAlignment="Center">
+                                    <Grid>
+                                        <Path Data="M4,2 H12 L14,4 V14 H4 Z"
+                                              Fill="{DynamicResource TextMuted}"
+                                              Width="10"
+                                              Height="10"
+                                              Stretch="Uniform"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                                        <Image Source="{Binding IconBitmap}"
+                                               Width="16"
+                                               Height="16"
+                                               Stretch="Uniform"
+                                               Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}" />
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding DisplayName}"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           TextTrimming="CharacterEllipsis" />
+
+                                <Slider Grid.Column="4"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource MixerVolumeSliderStyle}"
+                                        Tag="{Binding SessionKey}"
+                                        Value="{Binding VolumePercent, Mode=OneWay}"
+                                        PreviewMouseLeftButtonDown="OnSessionSliderMouseDown"
+                                        PreviewMouseLeftButtonUp="OnSessionSliderMouseUp"
+                                        LostMouseCapture="OnSessionSliderLostCapture"
+                                        ValueChanged="OnSessionSliderValueChanged"
+                                        AutomationProperties.Name="{Binding VolumeSliderActionLabel}" />
+
+                                <TextBlock Grid.Column="6"
+                                           Text="{Binding VolumePercentLabel}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="11"
+                                           Typography.NumeralAlignment="Tabular"
+                                           Foreground="{DynamicResource TextMuted}" />
+
+                                <Button Grid.Column="8"
+                                        Style="{StaticResource MuteIconButtonStyle}"
+                                        Tag="{Binding SessionKey}"
+                                        Click="OnSessionMuteClicked"
+                                        ToolTip="{Binding MuteActionLabel}"
+                                        AutomationProperties.Name="{Binding MuteActionLabel}">
+                                    <Grid Width="11" Height="11">
+                                        <Path Data="M1,3.5 H3.2 L6.5,1 V10 L3.2,7.5 H1 Z M8.5,3 C9.6,4.2 9.6,6.8 8.5,8"
+                                              Stroke="{DynamicResource TextPrimary}"
+                                              StrokeThickness="1.2"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Fill="Transparent">
+                                            <Path.Style>
+                                                <Style TargetType="Path">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Path.Style>
+                                        </Path>
+                                        <Path Data="M1,3.5 H3.2 L6.5,1 V10 L3.2,7.5 H1 Z M8,3 L10.5,8 M10.5,3 L8,8"
+                                              Stroke="{DynamicResource AgentStatusErrorBrush}"
+                                              StrokeThickness="1.2"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Fill="Transparent"
+                                              Visibility="{Binding IsMuted, Converter={StaticResource BoolToVis}}" />
+                                    </Grid>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Text="{Binding EmptyStateMessage}"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       FontFamily="{DynamicResource ShimaFontFamily}"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource TextMuted}"
+                       Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}"
+                       AutomationProperties.AutomationId="VolumeMixerEmptyStateText" />
+        </Grid>
+    </Grid>
+</UserControl>

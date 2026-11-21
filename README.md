@@ -2,7 +2,7 @@
 
 Shima is a Windows Dynamic Island desktop companion. It sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
 
-**Status: Phases 1–5 complete (T001–T032 done). Phase 6 (T033–T037) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v2 migrations), atomic config storage, the widget registry, island state and pinning, Win32 overlay adapters, the WPF island shell, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, and the World Clock widget (`shima.clock`). The Release build passes with 0 warnings and 0 errors across 109 unit, persistence, interop, widget, and FlaUI tests. Now Playing and Volume Mixer are next.
+**Status: Phases 1–6 complete (T001–T037 done). Phase 7 (T038–T044) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v2 migrations), atomic config storage, the widget registry, island state and pinning, Win32/WinRT/CoreAudio overlay, media, and mixer adapters, the WPF island shell with custom compact active pills, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, World Clock (`shima.clock`), Now Playing (`shima.music`), and Volume Mixer (`shima.mixer`). The Release build passes with 0 warnings and 0 errors across 117 unit, persistence, interop, widget, and FlaUI tests. Notes, Clipboard, and Inbox are next.
 
 ## Features
 
@@ -89,10 +89,10 @@ Order and milestones come from [development-roadmap.md](docs/blueprint/developme
 | 3. Island shell (states, DPI, fullscreen, pinning) | T011–T018 | M1 | Done |
 | 4. Settings + Advanced Color Picker + appearance | T019–T028 | M2 | Done |
 | 5. Clock widget | T029–T032 | M3 | Done |
-| 6. Now Playing + Volume Mixer | T033–T037 | M3 | Next |
-| 7. Notes + Clipboard + Inbox | T038–T044 | M4 | Not started |
+| 6. Now Playing + Volume Mixer | T033–T037 | M3 | Done |
+| 7. Notes + Clipboard + Inbox | T038–T044 | M4 | Next |
 | 8. Focus Timer + Zen Mode | T045–T048 | M3 | Not started |
 | 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Not started |
 | 10. Packaging, signing, release verification | T054–T056 | M6 | Not started |
 
-Next step: Phase 6, starting with T033 (GSMTC media session and CoreAudio WASAPI mixer adapter tests) before the Now Playing and Volume Mixer modules.
+Next step: Phase 7, starting with T038–T039 (repository, clipboard privacy exclusion, DND suppression, and Inbox identity-fallback tests) before Notes, Clipboard, and Inbox modules.

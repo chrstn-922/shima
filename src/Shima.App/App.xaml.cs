@@ -16,6 +16,10 @@ using Shima.Presentation.Settings;
 using Shima.Presentation.Shell;
 using Shima.Presentation.Theming;
 using Shima.Widgets.Clock;
+using Shima.Widgets.NowPlaying;
+using Shima.Widgets.VolumeMixer;
+using Shima.WindowsInterop.Audio;
+using Shima.WindowsInterop.Media;
 using Shima.WindowsInterop.Overlay;
 using Shima.WindowsInterop.System;
 
@@ -91,6 +95,32 @@ public partial class App : Application
             var coordinator = _serviceProvider.GetRequiredService<WidgetRegistrySettingsCoordinator>();
             var eventDispatcher = _serviceProvider.GetRequiredService<IEventDispatcher>();
 
+            object? cachedCompactView = null;
+            string? cachedCompactWidgetId = null;
+
+            void SyncCompactActiveView()
+            {
+                var widgetId = stateManager.CompactActiveWidgetId;
+                if (string.IsNullOrWhiteSpace(widgetId))
+                {
+                    cachedCompactWidgetId = null;
+                    cachedCompactView = null;
+                    islandWindow.SetCompactActiveContent(null);
+                    return;
+                }
+
+                if (!string.Equals(cachedCompactWidgetId, widgetId, StringComparison.Ordinal))
+                {
+                    cachedCompactWidgetId = widgetId;
+                    cachedCompactView = widgetRegistry.CreateCompactActiveView(widgetId);
+                }
+
+                islandWindow.SetCompactActiveContent(cachedCompactView);
+            }
+
+            SyncCompactActiveView();
+            stateManager.CompactPillUpdated += (_, _) => Dispatcher.BeginInvoke(SyncCompactActiveView);
+
             stateManager.StateChanged += (_, args) =>
             {
                 widgetRegistry.OnShellStateChanged(args.NewState);
@@ -111,7 +141,13 @@ public partial class App : Application
             islandWindow.WidgetHost.SelectedWidgetChanged += (_, widgetId) =>
                 _ = widgetRegistry.ActivateAsync(widgetId, WidgetActivationReason.UserSelection);
             coordinator.WidgetsChanged += (_, _) =>
-                Dispatcher.BeginInvoke(() => SyncIslandWidgetSlots(islandWindow, widgetRegistry));
+                Dispatcher.BeginInvoke(() =>
+                {
+                    cachedCompactWidgetId = null;
+                    cachedCompactView = null;
+                    SyncIslandWidgetSlots(islandWindow, widgetRegistry);
+                    SyncCompactActiveView();
+                });
             _openSettingsSubscription = eventDispatcher.Subscribe<OpenSettingsRequestedEvent>(
                 evt => Dispatcher.BeginInvoke(() => ShowOrActivateSettings(evt.SectionTag)));
 
@@ -294,6 +330,9 @@ public partial class App : Application
         services.AddSingleton<IOverlayPinController, OverlayPinController>();
         services.AddSingleton<IIslandStateManager, IslandStateManager>();
         services.AddSingleton<IIslandAttentionRequester, IslandAttentionRequester>();
+        services.AddSingleton<IMediaSessionAdapter, MediaSessionAdapter>();
+        services.AddSingleton<IAudioMixerAdapter, AudioMixerAdapter>();
+
         services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(sp =>
         [
             new WidgetModuleRegistration(
@@ -304,7 +343,31 @@ public partial class App : Application
                     DefaultOrder = 0,
                     DefaultAccentHex = "#FFFFFF"
                 },
-                () => new ClockWidgetModule(sp.GetRequiredService<IClockRepository>()))
+                () => new ClockWidgetModule(sp.GetRequiredService<IClockRepository>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = NowPlayingWidgetModule.Id,
+                    DisplayName = "Now Playing",
+                    DefaultOrder = 1,
+                    RequiresBackgroundSubscription = true,
+                    SupportsCompactActiveState = true,
+                    SupportsNotificationPeek = false,
+                    DefaultAccentHex = "#34D399"
+                },
+                () => new NowPlayingWidgetModule(sp.GetRequiredService<IMediaSessionAdapter>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = VolumeMixerWidgetModule.Id,
+                    DisplayName = "Volume Mixer",
+                    DefaultOrder = 6,
+                    RequiresBackgroundSubscription = true,
+                    SupportsCompactActiveState = false,
+                    SupportsNotificationPeek = false,
+                    DefaultAccentHex = "#38BDF8"
+                },
+                () => new VolumeMixerWidgetModule(sp.GetRequiredService<IAudioMixerAdapter>()))
         ]);
         services.AddSingleton<WidgetRegistry>();
         services.AddSingleton<WidgetRegistrySettingsCoordinator>();

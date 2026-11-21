@@ -11,4 +11,7 @@ public sealed class IslandAttentionRequester(IIslandStateManager stateManager) :
 
     public void UpdateCompactPill(string? badgeText) =>
         _stateManager.SetCompactActive(!string.IsNullOrWhiteSpace(badgeText), badgeText);
+
+    public void UpdateCompactPill(string? widgetId, string? badgeText) =>
+        _stateManager.SetCompactActive(widgetId, !string.IsNullOrWhiteSpace(badgeText), badgeText);
 }
