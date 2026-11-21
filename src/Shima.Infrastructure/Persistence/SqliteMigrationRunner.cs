@@ -23,6 +23,22 @@ public sealed class SqliteMigrationRunner
                 settings_json TEXT NOT NULL DEFAULT '{}',
                 updated_at_utc TEXT NOT NULL
             );
+            """),
+        new SqliteMigration(
+            2,
+            "world_clock_locations",
+            """
+            CREATE TABLE IF NOT EXISTS world_clock_locations (
+                location_id TEXT PRIMARY KEY,
+                city_name TEXT NOT NULL CHECK (length(city_name) BETWEEN 1 AND 80),
+                country_name TEXT NOT NULL CHECK (length(country_name) <= 80),
+                windows_tz_id TEXT NOT NULL,
+                iana_tz_id TEXT NOT NULL,
+                sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+                is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1))
+            );
+            CREATE INDEX IF NOT EXISTS idx_world_clock_locations_sort_order
+                ON world_clock_locations (sort_order, location_id);
             """)
     ];
 

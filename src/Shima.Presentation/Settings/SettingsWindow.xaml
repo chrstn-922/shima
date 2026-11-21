@@ -503,7 +503,9 @@
                     <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Clock" />
                     <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Local time format and world clock cities list." />
 
-                    <Border Style="{StaticResource SettingsCardStyle}">
+                    <ContentPresenter x:Name="ClockSettingsHost" />
+
+                    <Border x:Name="ClockSettingsPlaceholderCard" Style="{StaticResource SettingsCardStyle}">
                         <StackPanel>
                             <TextBlock Text="World clocks &amp; 12h/24h preferences"
                                        FontFamily="{DynamicResource ShimaFontFamily}"

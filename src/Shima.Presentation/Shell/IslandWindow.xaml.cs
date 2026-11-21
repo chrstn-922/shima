@@ -11,6 +11,7 @@ namespace Shima.Presentation.Shell;
 public partial class IslandWindow : Window
 {
     private const int ClickThroughDurationMs = 3000;
+    private const int WmTimeChange = 0x001E;
 
     private readonly IIslandStateManager _stateManager;
     private readonly IOverlayPinController _pinController;
@@ -19,6 +20,7 @@ public partial class IslandWindow : Window
     private readonly IFullscreenDetector _fullscreenDetector;
     private readonly IGlobalHotkeyService _globalHotkeyService;
     private readonly IPowerAndMotionMonitor _powerAndMotionMonitor;
+    private readonly IEventDispatcher? _eventDispatcher;
     private readonly ILogger? _logger;
 
     private readonly DispatcherTimer _hoverExpandTimer;
@@ -48,7 +50,8 @@ public partial class IslandWindow : Window
         IFullscreenDetector fullscreenDetector,
         IGlobalHotkeyService globalHotkeyService,
         IPowerAndMotionMonitor powerAndMotionMonitor,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        IEventDispatcher? eventDispatcher = null)
     {
         _stateManager = stateManager ?? throw new ArgumentNullException(nameof(stateManager));
         _pinController = pinController ?? throw new ArgumentNullException(nameof(pinController));
@@ -58,6 +61,7 @@ public partial class IslandWindow : Window
         _globalHotkeyService = globalHotkeyService ?? throw new ArgumentNullException(nameof(globalHotkeyService));
         _powerAndMotionMonitor = powerAndMotionMonitor ?? throw new ArgumentNullException(nameof(powerAndMotionMonitor));
         _logger = logger;
+        _eventDispatcher = eventDispatcher;
 
         InitializeComponent();
 
@@ -541,6 +545,11 @@ public partial class IslandWindow : Window
 
         _displayTopologyMonitor.HandleWindowMessage(msg, wParam, lParam, hwnd);
         _powerAndMotionMonitor.HandleWindowMessage(msg, wParam, lParam);
+
+        if (msg == WmTimeChange)
+        {
+            _eventDispatcher?.Publish(new SystemTimeChangedEvent(DateTimeOffset.UtcNow));
+        }
 
         if (_globalHotkeyService.HandleWindowMessage(msg, wParam))
         {

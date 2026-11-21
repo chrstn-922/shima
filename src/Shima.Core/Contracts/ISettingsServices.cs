@@ -85,4 +85,6 @@ public interface IWidgetSettingsCoordinator
     Task ResetSettingsAsync(string widgetId, CancellationToken ct = default);
 
     Task UpdateOrderAsync(IReadOnlyList<string> orderedWidgetIds, CancellationToken ct = default);
+
+    object? CreateSettingsView(string widgetId);
 }

@@ -10,10 +10,12 @@ using Shima.Infrastructure.Appearance;
 using Shima.Infrastructure.Color;
 using Shima.Infrastructure.Configuration;
 using Shima.Infrastructure.Persistence;
+using Shima.Infrastructure.Repositories;
 using Shima.Infrastructure.Storage;
 using Shima.Presentation.Settings;
 using Shima.Presentation.Shell;
 using Shima.Presentation.Theming;
+using Shima.Widgets.Clock;
 using Shima.WindowsInterop.Overlay;
 using Shima.WindowsInterop.System;
 
@@ -27,6 +29,7 @@ public partial class App : Application
     private ServiceProvider? _serviceProvider;
     private ILogger? _logger;
     private SettingsWindow? _settingsWindow;
+    private IDisposable? _openSettingsSubscription;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -81,12 +84,36 @@ public partial class App : Application
             themeRenderer.ApplyNow();
 
             ApplyPreferencesToShell(islandWindow, preferences);
+            SyncIslandWidgetSlots(islandWindow, widgetRegistry);
 
-            var slots = widgetRegistry.Widgets
-                .Where(widget => widget.IsEnabled)
-                .Select(widget => new WidgetSlotItem(widget.Metadata.WidgetId, widget.Metadata.DisplayName))
-                .ToArray();
-            islandWindow.SetWidgetSlots(slots, widgetRegistry.ActiveWidgetId);
+            var stateManager = _serviceProvider.GetRequiredService<IIslandStateManager>();
+            var powerMonitor = _serviceProvider.GetRequiredService<IPowerAndMotionMonitor>();
+            var coordinator = _serviceProvider.GetRequiredService<WidgetRegistrySettingsCoordinator>();
+            var eventDispatcher = _serviceProvider.GetRequiredService<IEventDispatcher>();
+
+            stateManager.StateChanged += (_, args) =>
+            {
+                widgetRegistry.OnShellStateChanged(args.NewState);
+                if (args.NewState == IslandShellState.Expanded)
+                {
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        var selectedId = islandWindow.WidgetHost.SelectedWidgetId ?? widgetRegistry.ActiveWidgetId;
+                        if (!string.IsNullOrWhiteSpace(selectedId))
+                        {
+                            _ = widgetRegistry.ActivateAsync(selectedId, WidgetActivationReason.UserSelection);
+                        }
+                    });
+                }
+            };
+
+            powerMonitor.PowerProfileChanged += (_, profile) => widgetRegistry.OnPowerProfileChanged(profile);
+            islandWindow.WidgetHost.SelectedWidgetChanged += (_, widgetId) =>
+                _ = widgetRegistry.ActivateAsync(widgetId, WidgetActivationReason.UserSelection);
+            coordinator.WidgetsChanged += (_, _) =>
+                Dispatcher.BeginInvoke(() => SyncIslandWidgetSlots(islandWindow, widgetRegistry));
+            _openSettingsSubscription = eventDispatcher.Subscribe<OpenSettingsRequestedEvent>(
+                evt => Dispatcher.BeginInvoke(() => ShowOrActivateSettings(evt.SectionTag)));
 
             islandWindow.Show();
 
@@ -106,7 +133,7 @@ public partial class App : Application
             trayService.Attach(
                 islandWindow,
                 () => Dispatcher.Invoke(() => Shutdown(0)),
-                () => Dispatcher.BeginInvoke(ShowOrActivateSettings));
+                () => Dispatcher.BeginInvoke(() => ShowOrActivateSettings(sectionTag: null)));
         }
         catch (Exception ex)
         {
@@ -117,6 +144,9 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _openSettingsSubscription?.Dispose();
+        _openSettingsSubscription = null;
+
         if (_settingsWindow is not null)
         {
             try
@@ -156,7 +186,7 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private void ShowOrActivateSettings()
+    private void ShowOrActivateSettings(string? sectionTag)
     {
         if (_serviceProvider is null)
         {
@@ -170,6 +200,11 @@ public partial class App : Application
                 _settingsWindow.WindowState = WindowState.Normal;
             }
 
+            if (!string.IsNullOrWhiteSpace(sectionTag))
+            {
+                _settingsWindow.SelectSection(sectionTag);
+            }
+
             _settingsWindow.Activate();
             return;
         }
@@ -177,7 +212,26 @@ public partial class App : Application
         _settingsWindow = _serviceProvider.GetRequiredService<SettingsWindow>();
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
+        if (!string.IsNullOrWhiteSpace(sectionTag))
+        {
+            _settingsWindow.SelectSection(sectionTag);
+        }
+
         _settingsWindow.Activate();
+    }
+
+    private static void SyncIslandWidgetSlots(IslandWindow islandWindow, WidgetRegistry widgetRegistry)
+    {
+        var slots = widgetRegistry.Widgets
+            .Where(widget => widget.IsEnabled)
+            .OrderBy(widget => widget.SortOrder)
+            .Select(widget => new WidgetSlotItem(
+                widget.Metadata.WidgetId,
+                widget.Metadata.DisplayName,
+                widgetRegistry.CreateExpandedView(widget.Metadata.WidgetId)))
+            .ToArray();
+
+        islandWindow.SetWidgetSlots(slots, widgetRegistry.ActiveWidgetId);
     }
 
     private static void ApplyPreferencesToShell(IslandWindow islandWindow, AppPreferencesSnapshot preferences) =>
@@ -234,14 +288,27 @@ public partial class App : Application
 
         services.AddSingleton(_ => new SqliteMigrationRunner(databasePath));
         services.AddSingleton<IWidgetConfigRepository>(_ => new SqliteWidgetConfigRepository(databasePath));
+        services.AddSingleton<IClockRepository>(_ => new ClockRepository(databasePath));
 
         services.AddSingleton<IEventDispatcher, InMemoryEventDispatcher>();
         services.AddSingleton<IOverlayPinController, OverlayPinController>();
         services.AddSingleton<IIslandStateManager, IslandStateManager>();
         services.AddSingleton<IIslandAttentionRequester, IslandAttentionRequester>();
-        services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(Array.Empty<WidgetModuleRegistration>());
+        services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(sp =>
+        [
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = ClockWidgetModule.Id,
+                    DisplayName = "Clock",
+                    DefaultOrder = 0,
+                    DefaultAccentHex = "#FFFFFF"
+                },
+                () => new ClockWidgetModule(sp.GetRequiredService<IClockRepository>()))
+        ]);
         services.AddSingleton<WidgetRegistry>();
-        services.AddSingleton<IWidgetSettingsCoordinator, WidgetRegistrySettingsCoordinator>();
+        services.AddSingleton<WidgetRegistrySettingsCoordinator>();
+        services.AddSingleton<IWidgetSettingsCoordinator>(sp => sp.GetRequiredService<WidgetRegistrySettingsCoordinator>());
 
         services.AddSingleton<IOverlayWindowAdapter, OverlayWindowAdapter>();
         services.AddSingleton<IDisplayTopologyMonitor, DisplayTopologyMonitor>();

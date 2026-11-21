@@ -108,21 +108,32 @@ public sealed class SqliteMigrationRunnerTests : TempDirectoryTest
             ((string?)await journalMode.ExecuteScalarAsync()).Should().Be("wal");
         }
 
+        var appliedVersions = new List<int>();
         await using (var migrations = connection.CreateCommand())
         {
-            migrations.CommandText = "SELECT version, applied_at_utc FROM schema_migrations;";
+            migrations.CommandText = "SELECT version, applied_at_utc FROM schema_migrations ORDER BY version;";
             await using var reader = await migrations.ExecuteReaderAsync();
-            (await reader.ReadAsync()).Should().BeTrue();
-            reader.GetInt32(0).Should().Be(1);
-            DateTimeOffset.TryParse(reader.GetString(1), out _).Should().BeTrue();
-            (await reader.ReadAsync()).Should().BeFalse();
+            while (await reader.ReadAsync())
+            {
+                appliedVersions.Add(reader.GetInt32(0));
+                DateTimeOffset.TryParse(reader.GetString(1), out _).Should().BeTrue();
+            }
         }
+
+        appliedVersions.Should().Equal(1, 2);
 
         await using (var widgetConfigs = connection.CreateCommand())
         {
             widgetConfigs.CommandText =
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'widget_configs';";
             (await widgetConfigs.ExecuteScalarAsync()).Should().Be("widget_configs");
+        }
+
+        await using (var worldClocks = connection.CreateCommand())
+        {
+            worldClocks.CommandText =
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'world_clock_locations';";
+            (await worldClocks.ExecuteScalarAsync()).Should().Be("world_clock_locations");
         }
     }
 

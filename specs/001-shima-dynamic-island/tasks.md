@@ -96,13 +96,13 @@
 
 ### Tests for User Story 2
 
-- [ ] T029 [P] [US2] Write unit tests for `ClockWidget` timezone/DST conversion, 12h/24h formatting, and timer suspension on `DeactivateAsync` in `tests/Shima.Widgets.Tests/ClockWidgetTests.cs`
+- [X] T029 [P] [US2] Write unit tests for `ClockWidget` timezone/DST conversion, 12h/24h formatting, and timer suspension on `DeactivateAsync` in `tests/Shima.Widgets.Tests/ClockWidgetTests.cs`
 
 ### Implementation for User Story 2
 
-- [ ] T030 [P] [US2] Implement `ClockRepository` persisting `WORLD_CLOCK_LOCATION.location_id`, `WORLD_CLOCK_LOCATION.city_name`, `WORLD_CLOCK_LOCATION.country_name`, `WORLD_CLOCK_LOCATION.windows_tz_id`, `WORLD_CLOCK_LOCATION.iana_tz_id`, `WORLD_CLOCK_LOCATION.sort_order`, and `WORLD_CLOCK_LOCATION.is_primary` per `data-model.md` in `src/Shima.Infrastructure/Repositories/ClockRepository.cs`
-- [ ] T031 [US2] Implement `ClockWidgetModule` (`shima.clock`) with minute-aligned timer and `WM_TIMECHANGE` subscription in `src/Shima.Widgets/Shima.Widgets.Clock/`
-- [ ] T032 [US2] Build two-column Clock view (Date, `HeroMetric` time, `City · UTC+offset`, city selector list, `⚙` settings trigger) and Clock Settings panel in `src/Shima.Widgets/Shima.Widgets.Clock/Views/`
+- [X] T030 [P] [US2] Implement `ClockRepository` persisting `WORLD_CLOCK_LOCATION.location_id`, `WORLD_CLOCK_LOCATION.city_name`, `WORLD_CLOCK_LOCATION.country_name`, `WORLD_CLOCK_LOCATION.windows_tz_id`, `WORLD_CLOCK_LOCATION.iana_tz_id`, `WORLD_CLOCK_LOCATION.sort_order`, and `WORLD_CLOCK_LOCATION.is_primary` per `data-model.md` in `src/Shima.Infrastructure/Repositories/ClockRepository.cs`
+- [X] T031 [US2] Implement `ClockWidgetModule` (`shima.clock`) with minute-aligned timer and `WM_TIMECHANGE` subscription in `src/Shima.Widgets/Shima.Widgets.Clock/`
+- [X] T032 [US2] Build two-column Clock view (Date, `HeroMetric` time, `City · UTC+offset`, city selector list, `⚙` settings trigger) and Clock Settings panel in `src/Shima.Widgets/Shima.Widgets.Clock/Views/`
 
 ---
 

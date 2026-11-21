@@ -81,6 +81,16 @@ public partial class SettingsWindow : Window
         }
 
         await RefreshWidgetsPanelAsync().ConfigureAwait(true);
+        RefreshClockSettingsHost();
+    }
+
+    private void RefreshClockSettingsHost()
+    {
+        var clockSettingsView = _widgetCoordinator?.CreateSettingsView("shima.clock");
+        ClockSettingsHost.Content = clockSettingsView;
+        ClockSettingsPlaceholderCard.Visibility = clockSettingsView is null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     public void SelectSection(string sectionTag)
@@ -126,6 +136,10 @@ public partial class SettingsWindow : Window
         if (string.Equals(tag, "Widgets", StringComparison.Ordinal))
         {
             _ = RefreshWidgetsPanelAsync();
+        }
+        else if (string.Equals(tag, "Clock", StringComparison.Ordinal))
+        {
+            RefreshClockSettingsHost();
         }
         else if (string.Equals(tag, "General", StringComparison.Ordinal))
         {
@@ -777,6 +791,7 @@ public partial class SettingsWindow : Window
 
     private void OnSettingsClosed(object? sender, EventArgs e)
     {
+        ClockSettingsHost.Content = null;
         _appearanceManager.AppearanceChanged -= OnAppearanceChanged;
         _appearanceManager.RenderedAppearanceChanged -= OnAppearanceChanged;
         _presetManager.CatalogChanged -= OnPresetCatalogChanged;
