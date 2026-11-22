@@ -4,7 +4,7 @@
 
 # Shima
 
-**A Windows Dynamic Island desktop companion — zero idle CPU, 8 modular widgets.**
+**A Windows Dynamic Island desktop companion — ~0% idle CPU, 8 modular widgets.**
 
 [Download v1.0.0](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) ·
 [`Shima-Setup-1.0.0-win-x64.exe`](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe) ·
@@ -12,9 +12,7 @@
 
 </div>
 
-Shima sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
-
-**Status: All Phases 1–10 complete (T001–T056 done).** The solution includes core contracts, SQLite WAL persistence (v1–v7 migrations including `agent_session_logs`), atomic config and `runtime-journal.json` recovery storage, the widget registry with lazy expanded view loading, island state and pinning with multi-widget compact pill coexistence, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, Zen audio/display adapters, `Shima.AgentBridge`, independent opt-in `ClaudeCodeAdapter` and `OpenCodeAdapter` coding-agent adapters, the WPF island shell with collapsed notch status indicator and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, all 8 modular widgets (`Clock`, `Now Playing`, `Focus Timer`, `Notes`, `Inbox`, `Clipboard`, `Volume Mixer`, `Developer Activity`), offline-first `UpdateServiceAdapter` (HTTPS + SHA-256 + ECDSA manifest verification) and DPAPI-cached `LicenseServiceAdapter`, plus Sparse MSIX identity (`build/sparse-msix/AppxManifest.xml`) and dual-RID (`win-x64`, `win-arm64`) build/sign/verification scripts in `build/`. The Release build passes with 0 warnings and 0 errors across 171 unit, persistence, interop, widget, packaging, and FlaUI UI tests, and clean-profile live verification measured `320 ms` startup-to-input-idle, `0%` steady-state idle CPU, `0` TCP sockets, `79.22 MB` max private memory (`-0.1 MB` growth), `159.62 MB` max shared+private WPF/WinRT working set, and `-3` handle delta over a 15-second probe (`0` `System.Drawing` references, `0` hardcoded XAML hex literals).
+Shima sits flush at the top-center edge of your Windows screen, stays collapsed at ~0% CPU when idle, and expands into 8 modular widgets on hover, click, or system events. All data stays local on your machine with zero outbound network connections.
 
 ## Screenshots
 
@@ -26,116 +24,62 @@ Shima sits flush at the top-center edge of the display, stays collapsed and idle
 | :---: | :---: |
 | ![Expanded Widget View](docs/media/extended-island.png) | ![Settings Window](docs/media/settings.png) |
 
+## Installation
+
+1. Download **`Shima-Setup-1.0.0-win-x64.exe`** (or **`Shima-Setup-1.0.0-win-arm64.exe`** for ARM64 devices) from the [v1.0.0 release page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0).
+2. Run the installer. Because v1.0.0 uses a self-signed certificate, Windows SmartScreen may show *"Windows protected your PC"* — click **More info → Run anyway** to continue.
+3. During setup on Windows 10 (build 19041+) or Windows 11, the installer automatically registers the Sparse MSIX identity (`Shima.Identity-<rid>.msix`) so the **Notification Inbox** connects to Windows Action Center right away.
+4. Keep **Launch Shima** checked on the final screen.
+
+> Portable `.zip` builds and standalone `.msix` identity packages are also available on the [Releases page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0). Uninstalling from Windows **Installed apps** cleanly removes the app and unregisters the Sparse MSIX identity while keeping your data in `%LOCALAPPDATA%\Shima\`.
+
 ## Features
 
-**Widgets** (`IWidgetModule` implementations, each independently enable/disable/reorder/configure):
+### 8 Modular Widgets
+Each widget can be enabled, disabled, reordered, or configured independently in **Settings**:
 
-- **Clock** — local time, date, UTC offset, multi-city world clock, 12h/24h.
-- **Now Playing** — GSMTC media session metadata, artwork, transport and seek controls.
-- **Focus Timer** — Pomodoro and custom intervals, Zen mode with white/pink/brown noise, crash-safe screen dimming/grayscale.
-- **Notes** — multi-note scratchpad, auto-save within 500 ms, search.
-- **Inbox** — native Windows notification capture grouped by app, DND-aware, bidirectional Action Center dismissal.
-- **Clipboard** — local text/image history, pin, search, pause, clear, password-manager exclusion.
-- **Volume Mixer** — per-app WASAPI volume sliders and mute, synced with Windows.
-- **Developer Activity** — opt-in Claude Code and OpenCode adapters with `Working` / `Needs attention` / `Awaiting approval` / `Finished` states and Allow/Deny.
+- **Clock** — Local time, date, UTC offset, multi-city world clock, and 12h/24h formatting.
+- **Now Playing** — System media metadata, album artwork, transport controls, and seek bar via Windows GSMTC.
+- **Focus Timer** — Pomodoro and custom intervals with Zen mode (white/pink/brown ambient noise and crash-safe screen dimming/grayscale).
+- **Notes** — Multi-note scratchpad with explicit Save (`Ctrl+S`), draft persistence, search, and note navigation.
+- **Inbox** — Native Windows notification feed grouped by app, DND-aware, with bidirectional Action Center dismissal.
+- **Clipboard** — Local text and image history with pin, search, pause, clear, and automatic password-manager exclusion.
+- **Volume Mixer** — Per-app Windows audio volume sliders and mute toggles synced in real time.
+- **Developer Activity** — Opt-in Claude Code and OpenCode integration showing `Working`, `Needs attention`, `Awaiting approval`, and `Finished` states with inline Allow/Deny actions.
 
-**Appearance system**: six island color tokens (Background, Accent, Border, Highlight/Glow, Text, Icon) for collapsed and expanded states, with a Photoshop-style Advanced Color Picker — 2D saturation/brightness field, 0–360° hue slider, synchronized HEX/RGB/HSB inputs, Current vs. New swatch, 6 built-in presets, custom presets, recent colors, live pinned island preview, and non-blocking WCAG contrast warnings with `Restore Recommended Contrast`.
+### Customization & Privacy
+- **Appearance System** — Six customizable color tokens (Background, Accent, Border, Highlight/Glow, Text, Icon) for both collapsed and expanded states, 6 built-in themes, custom presets, live preview, and WCAG contrast warnings.
+- **Advanced Color Picker** — 2D saturation/brightness field, 0–360° hue slider, synchronized HEX/RGB/HSB inputs, and recent color swatches.
+- **Local-First by Default** — Settings, notes, clipboard history, and notifications are stored locally in `%LOCALAPPDATA%\Shima\` using SQLite (WAL mode) and atomic JSON files. Core features make zero network requests.
 
-**Local-first privacy**: preferences, widget state, notes, clipboard, and notification history stay in `%LOCALAPPDATA%\Shima\`. Sensitive content is never transmitted. Core functionality opens zero outbound network connections. Clipboard payloads flagged by password managers are skipped.
+## Tech Stack & Architecture
 
-## Tech Stack
+- **.NET 8 (LTS) / C# 12** targeting `net8.0-windows10.0.22621.0`
+- **WPF** for the island shell, settings window, and custom color picker
+- **CsWin32 & WinRT** for Win32/COM overlays, GSMTC media controls, `UserNotificationListener`, and `StartupTask`
+- **NAudio.Wasapi** for CoreAudio volume sessions and ambient Zen audio
+- **SQLite (`Microsoft.Data.Sqlite`)** in WAL mode for local persistence
+- **Sparse MSIX + Inno Setup** for desktop installation and Windows notification identity
 
-- .NET 8 (LTS) / C# 12, `net8.0-windows10.0.22621.0`
-- WPF for the island shell and settings (`WriteableBitmap` for the color field)
-- CsWin32 for Win32/COM bindings; WinRT projections for GSMTC, `UserNotificationListener`, `StartupTask`
-- NAudio.Wasapi for CoreAudio sessions and Zen ambient noise
-- Microsoft.Data.Sqlite in WAL mode, plus atomic JSON config files
-- Velopack with a Sparse MSIX package for update delivery and notification identity
-- xUnit, FluentAssertions, NSubstitute, FlaUI for tests
+The solution is split into five inward-only dependency layers (`Shima.Core`, `Shima.Presentation`, `Shima.Widgets.*`, `Shima.WindowsInterop`, `Shima.Infrastructure`), with `Shima.App` as the composition root and `Shima.AgentBridge` as a standalone CLI for coding-agent hooks. Full design docs and specs live in [`docs/blueprint/`](docs/blueprint/) and [`specs/001-shima-dynamic-island/`](specs/001-shima-dynamic-island/).
 
-## Architecture & Docs
+## Building from Source
 
-Five layers with inward-only dependencies. `Shima.Core` holds contracts and domain models and depends on nothing else. `Shima.Presentation` (WPF shell, widgets host, settings, color picker), `Shima.Widgets.*` (one assembly per widget), `Shima.WindowsInterop` (Win32/WinRT/COM adapters), and `Shima.Infrastructure` (SQLite, JSON, DPAPI, services) all depend only on `Shima.Core`. `Shima.App` is the composition root; `Shima.AgentBridge` is a small standalone CLI for Claude Code hooks.
-
-- [spec.md](specs/001-shima-dynamic-island/spec.md) — product spec, user stories, edge cases, functional requirements
-- [plan.md](specs/001-shima-dynamic-island/plan.md) — architecture, project layout, constitution check
-- [research.md](specs/001-shima-dynamic-island/research.md) — Windows API and stack research
-- [data-model.md](specs/001-shima-dynamic-island/data-model.md) — SQLite schema, JSON configs, retention
-- [tasks.md](specs/001-shima-dynamic-island/tasks.md) — T001–T056, dependency-ordered
-- [quickstart.md](specs/001-shima-dynamic-island/quickstart.md) — prerequisites and validation walkthrough
-- [contracts/](specs/001-shima-dynamic-island/contracts/) — widget, Windows adapter, coding agent, color picker, appearance, infrastructure contracts
-- [system-architecture.md](docs/blueprint/system-architecture.md) — layer breakdown and diagrams
-- [windows-integration-design.md](docs/blueprint/windows-integration-design.md) — overlay window, fullscreen detection, DPI, pinning
-- [color-picker-architecture.md](docs/blueprint/color-picker-architecture.md) and [appearance-system.md](docs/blueprint/appearance-system.md)
-- [security-privacy-architecture.md](docs/blueprint/security-privacy-architecture.md) and [performance-strategy.md](docs/blueprint/performance-strategy.md)
-- [test-strategy.md](docs/blueprint/test-strategy.md), [deployment-strategy.md](docs/blueprint/deployment-strategy.md), [risk-register.md](docs/blueprint/risk-register.md)
-- [development-roadmap.md](docs/blueprint/development-roadmap.md), [architectural-decision-records.md](docs/blueprint/architectural-decision-records.md)
-
-## Installer (Recommended)
-
-For the simplest Windows setup with **Notification Inbox** unlocked automatically on first launch, download and run the matching Inno Setup installer from the [v1.0.0 release](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) (`Shima-Setup-1.0.0-win-x64.exe` or `Shima-Setup-1.0.0-win-arm64.exe`):
-
-1. Run `Shima-Setup-1.0.0-win-x64.exe` (or `Shima-Setup-1.0.0-win-arm64.exe`) and follow the guided wizard (installs to `Program Files\Shima` with Start Menu and optional Desktop shortcuts).
-2. During setup on Windows 10 2004+ / Windows 11, the installer automatically prepares the embedded Sparse MSIX certificate (if self-signed) and registers `Shima.Identity-<rid>.msix` for your logged-in Windows user account.
-3. Keep **"Launch Shima"** checked on the finish screen — Shima starts immediately with Windows package identity active so the Notification Inbox works out of the box (older Windows builds fall back gracefully with all other widgets active).
-4. Uninstalling from Windows **Installed apps / Add or Remove Programs** cleanly stops Shima and unregisters the Sparse MSIX identity while preserving your local data in `%LOCALAPPDATA%\Shima\`.
-
-### Installation & SmartScreen Note
-
-- **Automatic Sparse MSIX Identity:** The installer handles trusting and registering the Sparse MSIX identity package (`Shima.Identity-<rid>.msix`) automatically so Windows Action Center integration for the **Notification Inbox** works immediately after install.
-- **Windows SmartScreen Prompt:** Because `v1.0.0` is signed with a self-signed certificate, Windows SmartScreen may display *"Windows protected your PC"* when launching the installer. Click **More info → Run anyway** to proceed.
-
-Portable `.zip` archives and standalone `Shima.Identity-<rid>.msix` packages remain available alongside the installer on the [Releases page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) for manual or portable deployments.
-
-## Local Setup
-
-Prerequisites:
-
-- Windows 10 version 2004 (build 19041) or newer, or Windows 11 — x64 or ARM64
+### Prerequisites
+- Windows 10 (version 2004 / build 19041+) or Windows 11 (x64 or ARM64)
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) with the Windows Desktop workload
-- Windows 10/11 SDK `10.0.22621.0` or newer (WinRT projections, `MakeAppx.exe`, `SignTool.exe`)
-- PowerShell 5.1+ or pwsh 7+
-- Optional, for the Developer widget: Claude Code and/or OpenCode CLI
+- Windows 10/11 SDK `10.0.22621.0` or newer (`MakeAppx.exe`, `SignTool.exe`, `MakePri.exe`)
+- PowerShell 5.1+ or PowerShell 7+
+- *(Optional)* [Inno Setup 6](https://jrsoftware.org/isinfo.php) to compile `Shima-Setup-*.exe`
 
-Verify the environment:
-
-```powershell
-[System.Environment]::OSVersion.Version   # expect >= 10.0.19041
-dotnet --info                             # expect an 8.0.x SDK
-& ".specify/scripts/powershell/check-prerequisites.ps1" -Json
-```
-
-Build, test, and run from the repository root:
-
+### Build, Test & Run
 ```powershell
 dotnet build Shima.sln -c Release
 dotnet test Shima.sln -c Release
 dotnet run --project src/Shima.App -c Release
 ```
 
-The Release build is expected to finish with 0 warnings and 0 errors. Full validation scenarios are in [quickstart.md](specs/001-shima-dynamic-island/quickstart.md).
-
-## Roadmap
-
-Order and milestones come from [development-roadmap.md](docs/blueprint/development-roadmap.md) and [tasks.md](specs/001-shima-dynamic-island/tasks.md).
-
-| Phase | Tasks | Milestone | Status |
-| :--- | :--- | :--- | :--- |
-| Blueprint: spec, research, plan, data model, contracts, docs | — | — | Done |
-| 1. Solution scaffolding + Phase 0 API spikes | T001–T004 | M0 | Done |
-| 2. Core contracts, SQLite, config, widget registry | T005–T010 | M0/M1 | Done |
-| 3. Island shell (states, DPI, fullscreen, pinning) | T011–T018 | M1 | Done |
-| 4. Settings + Advanced Color Picker + appearance | T019–T028 | M2 | Done |
-| 5. Clock widget | T029–T032 | M3 | Done |
-| 6. Now Playing + Volume Mixer | T033–T037 | M3 | Done |
-| 7. Notes + Clipboard + Inbox | T038–T044 | M4 | Done |
-| 8. Focus Timer + Zen Mode | T045–T048 | M3 | Done |
-| 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Done |
-| 10. Packaging, signing, release verification | T054–T056 | M6 | Done |
-
-Release packaging & full soak verification (`win-x64` / `win-arm64` portable `.zip` + Sparse MSIX + Inno Setup `Shima-Setup-*.exe` when Inno Setup 6 is installed):
-
+### Package Release Artifacts
 ```powershell
-.\build\build-release.ps1
-.\build\verify-release.ps1 -SoakDurationSeconds 28800
+.\build\build-release.ps1 -Sign -CreateDevSelfSignedCert
 ```
