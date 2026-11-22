@@ -1,0 +1,441 @@
+<UserControl x:Class="Shima.Widgets.FocusTimer.Views.FocusTimerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="{Binding AccessibleStatus}"
+             AutomationProperties.AutomationId="FocusTimerWidgetView">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="FocusPillButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfacePillButton}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="7,3" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FocusPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource FocusPillButtonStyle}">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="10,3" />
+        </Style>
+
+        <Style x:Key="FocusPhaseChipStyle" TargetType="Button" BasedOn="{StaticResource FocusPillButtonStyle}">
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style x:Key="FocusNoiseChipStyle" TargetType="Button" BasedOn="{StaticResource FocusPillButtonStyle}">
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+        </Style>
+
+        <Style x:Key="FocusTogglePillStyle" TargetType="Button" BasedOn="{StaticResource FocusPillButtonStyle}">
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+        </Style>
+
+        <Style x:Key="FocusProgressStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Background" Value="{DynamicResource AgentStatusTrackBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border x:Name="PART_Track"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="2" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FocusVolumeSliderStyle" TargetType="Slider">
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="IsMoveToPointEnabled" Value="True" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="16" Background="Transparent">
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" CornerRadius="2" Background="{DynamicResource AccentBrush}" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="4" CornerRadius="2" Background="{DynamicResource AgentStatusTrackBrush}" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="10" Height="10">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="{DynamicResource TextPrimary}" />
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="10" />
+            <ColumnDefinition Width="172" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left Pane: Phase selector, tabular countdown, progress, and transport actions -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="6" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Phase switcher tabs -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal">
+                <Button Content="Focus"
+                        Tag="Work"
+                        Click="OnPhaseSelected"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Switch to Focus phase">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource FocusPhaseChipStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsWorkSelected}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceElevated}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button Content="Short"
+                        Tag="ShortBreak"
+                        Click="OnPhaseSelected"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="Switch to Short break phase">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource FocusPhaseChipStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsShortBreakSelected}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceElevated}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <Button Content="Long"
+                        Tag="LongBreak"
+                        Click="OnPhaseSelected"
+                        AutomationProperties.Name="Switch to Long break phase">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource FocusPhaseChipStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLongBreakSelected}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceElevated}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+
+            <!-- Hero tabular countdown & cycle readout -->
+            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding CountdownDisplay}"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="34"
+                           FontWeight="Light"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{DynamicResource TextPrimary}"
+                           AutomationProperties.AutomationId="FocusCountdownText" />
+                <TextBlock FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="10.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           TextTrimming="CharacterEllipsis">
+                    <Run Text="{Binding CycleStatusLabel, Mode=OneWay}" />
+                    <Run Text=" · " />
+                    <Run Text="{Binding StatsLabel, Mode=OneWay}" />
+                </TextBlock>
+            </StackPanel>
+
+            <!-- Progress bar -->
+            <ProgressBar Grid.Row="2"
+                         Style="{StaticResource FocusProgressStyle}"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="{Binding ProgressPercent, Mode=OneWay}" />
+
+            <!-- Primary transport buttons + Settings trigger -->
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button Style="{StaticResource FocusPrimaryButtonStyle}"
+                            Content="{Binding PrimaryActionLabel}"
+                            Margin="0,0,4,0"
+                            Click="OnStartPauseClicked"
+                            AutomationProperties.Name="{Binding PrimaryActionAutomationName}"
+                            AutomationProperties.AutomationId="FocusStartPauseButton" />
+
+                    <Button Style="{StaticResource FocusPillButtonStyle}"
+                            Content="Reset"
+                            Margin="0,0,4,0"
+                            Click="OnResetClicked"
+                            AutomationProperties.Name="Reset focus timer"
+                            AutomationProperties.AutomationId="FocusResetButton" />
+
+                    <Button Style="{StaticResource FocusPillButtonStyle}"
+                            Content="Skip"
+                            Click="OnSkipClicked"
+                            AutomationProperties.Name="Skip to next focus phase"
+                            AutomationProperties.AutomationId="FocusSkipButton" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource FocusPillButtonStyle}"
+                        Padding="6,3"
+                        Content="&#x2699;"
+                        ToolTip="Focus timer settings"
+                        Click="OnOpenSettingsClicked"
+                        AutomationProperties.Name="Open Focus Timer settings"
+                        AutomationProperties.AutomationId="FocusSettingsButton" />
+            </Grid>
+        </Grid>
+
+        <!-- Right Pane: Zen Mode (DSP noise + crash-safe screen dim/grayscale) -->
+        <Border Grid.Column="2"
+                Background="{DynamicResource SurfaceElevated}"
+                BorderBrush="{DynamicResource BorderHairline}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="8,7">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" LastChildFill="False">
+                    <TextBlock DockPanel.Dock="Left"
+                               Text="Zen mode"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="11.5"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
+                    <TextBlock DockPanel.Dock="Right"
+                               Text="Restored"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="9.5"
+                               Foreground="{DynamicResource WarningBannerText}"
+                               ToolTip="Display was safely restored after unexpected termination"
+                               Visibility="{Binding ShowCrashRecoveryNotice, Converter={StaticResource BoolToVis}}" />
+                </DockPanel>
+
+                <!-- Noise pills -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Content="Off" Tag="None" Click="OnNoiseSelected" AutomationProperties.Name="Turn Zen noise off">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FocusNoiseChipStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsNoiseNone}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Grid.Column="2" Content="Wht" Tag="White" ToolTip="White noise" Click="OnNoiseSelected" AutomationProperties.Name="Select White noise">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FocusNoiseChipStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsNoiseWhite}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Grid.Column="4" Content="Pnk" Tag="Pink" ToolTip="Pink noise" Click="OnNoiseSelected" AutomationProperties.Name="Select Pink noise">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FocusNoiseChipStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsNoisePink}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Grid.Column="6" Content="Brn" Tag="Brown" ToolTip="Brown noise" Click="OnNoiseSelected" AutomationProperties.Name="Select Brown noise">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FocusNoiseChipStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsNoiseBrown}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+
+                <!-- Noise volume -->
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Vol"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="10"
+                               VerticalAlignment="Center"
+                               Margin="0,0,6,0"
+                               Foreground="{DynamicResource TextMuted}" />
+                    <Slider Grid.Column="1"
+                            Style="{StaticResource FocusVolumeSliderStyle}"
+                            Value="{Binding NoiseVolumePercent, Mode=TwoWay}"
+                            AutomationProperties.Name="Zen ambient noise volume" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding NoiseVolumeLabel}"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="10"
+                               Typography.NumeralAlignment="Tabular"
+                               VerticalAlignment="Center"
+                               Margin="6,0,0,0"
+                               Foreground="{DynamicResource TextMuted}" />
+                </Grid>
+
+                <!-- Screen grayscale & dim toggles -->
+                <Grid Grid.Row="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0"
+                            Content="Grayscale"
+                            Click="OnToggleGrayscaleClicked"
+                            AutomationProperties.Name="Toggle Zen grayscale display filter">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FocusTogglePillStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsGrayscaleEnabled}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <Button Grid.Column="2"
+                            Content="Dim"
+                            Click="OnToggleDimClicked"
+                            AutomationProperties.Name="Toggle Zen screen dimming">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FocusTogglePillStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDimEnabled}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

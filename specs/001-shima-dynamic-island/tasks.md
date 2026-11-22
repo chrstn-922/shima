@@ -154,13 +154,13 @@
 
 ### Tests for User Story 5
 
-- [ ] T045 [P] [US5] Write unit tests for Pomodoro phase state machine, DSP noise generators, and `runtime-journal.json` pre-effect crash-recovery flagging in `tests/Shima.Widgets.Tests/FocusTimerWidgetTests.cs`
+- [X] T045 [P] [US5] Write unit tests for Pomodoro phase state machine, DSP noise generators, and `runtime-journal.json` pre-effect crash-recovery flagging in `tests/Shima.Widgets.Tests/FocusTimerWidgetTests.cs`
 
 ### Implementation for User Story 5
 
-- [ ] T046 [P] [US5] Implement `FocusRepository` (`FOCUS_SESSION.session_id`, `FOCUS_SESSION.phase_type`, `FOCUS_SESSION.planned_seconds`, `FOCUS_SESSION.completed_seconds`, `FOCUS_SESSION.zen_noise_type`, `FOCUS_SESSION.screen_effect_used`, `FOCUS_SESSION.started_at_utc` per `data-model.md`) in `src/Shima.Infrastructure/Repositories/FocusRepository.cs`
-- [ ] T047 [P] [US5] Implement `ZenAudioSynthAdapter` (`NAudio.Wasapi` `WasapiOut` DSP white/pink/brown noise) and `ZenDisplayEffectAdapter` (`MagSetFullscreenColorEffect` + click-through dim overlay + `runtime-journal.json` startup watchdog) in `src/Shima.WindowsInterop/Zen/`
-- [ ] T048 [US5] Implement `FocusTimerWidgetModule` (`shima.focus`, Pomodoro/custom intervals, compact `Active` countdown, Zen controls & Settings) in `src/Shima.Widgets/Shima.Widgets.FocusTimer/`
+- [X] T046 [P] [US5] Implement `FocusRepository` (`FOCUS_SESSION.session_id`, `FOCUS_SESSION.phase_type`, `FOCUS_SESSION.planned_seconds`, `FOCUS_SESSION.completed_seconds`, `FOCUS_SESSION.zen_noise_type`, `FOCUS_SESSION.screen_effect_used`, `FOCUS_SESSION.started_at_utc` per `data-model.md`) in `src/Shima.Infrastructure/Repositories/FocusRepository.cs`
+- [X] T047 [P] [US5] Implement `ZenAudioSynthAdapter` (`NAudio.Wasapi` `WasapiOut` DSP white/pink/brown noise) and `ZenDisplayEffectAdapter` (`MagSetFullscreenColorEffect` + click-through dim overlay + `runtime-journal.json` startup watchdog) in `src/Shima.WindowsInterop/Zen/`
+- [X] T048 [US5] Implement `FocusTimerWidgetModule` (`shima.focus`, Pomodoro/custom intervals, compact `Active` countdown, Zen controls & Settings) in `src/Shima.Widgets/Shima.Widgets.FocusTimer/`
 
 ---
 

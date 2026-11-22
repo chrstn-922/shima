@@ -1,0 +1,205 @@
+<UserControl x:Class="Shima.Widgets.FocusTimer.Views.FocusTimerSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Focus Timer settings">
+    <UserControl.Resources>
+        <Style x:Key="FocusSettingsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsCard}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="FocusSettingsInputStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+
+        <Style x:Key="FocusSettingsButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- Pomodoro Intervals -->
+        <Border Style="{StaticResource FocusSettingsCardStyle}">
+            <StackPanel>
+                <DockPanel LastChildFill="False" Margin="0,0,0,12">
+                    <TextBlock DockPanel.Dock="Left"
+                               Text="Pomodoro intervals"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
+
+                    <Button DockPanel.Dock="Right"
+                            Content="Reset defaults"
+                            Style="{StaticResource FocusSettingsButtonStyle}"
+                            Click="OnResetDefaultsClicked"
+                            AutomationProperties.Name="Reset Focus Timer settings to defaults"
+                            AutomationProperties.AutomationId="FocusResetDefaultsButton" />
+                </DockPanel>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Work duration (minutes)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                    <TextBox x:Name="WorkMinutesBox" Grid.Column="1" Style="{StaticResource FocusSettingsInputStyle}" LostFocus="OnIntervalsLostFocus" />
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Short break (minutes)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                    <TextBox x:Name="ShortBreakMinutesBox" Grid.Column="1" Style="{StaticResource FocusSettingsInputStyle}" LostFocus="OnIntervalsLostFocus" />
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Long break (minutes)" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                    <TextBox x:Name="LongBreakMinutesBox" Grid.Column="1" Style="{StaticResource FocusSettingsInputStyle}" LostFocus="OnIntervalsLostFocus" />
+                </Grid>
+
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Work cycles before long break" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                    <TextBox x:Name="CyclesBox" Grid.Column="1" Style="{StaticResource FocusSettingsInputStyle}" LostFocus="OnIntervalsLostFocus" />
+                </Grid>
+
+                <CheckBox x:Name="AutoStartCheck"
+                          Content="Automatically start next work or break phase"
+                          IsChecked="{Binding AutoStartNextPhase, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Checked="OnBehaviorToggled"
+                          Unchecked="OnBehaviorToggled" />
+            </StackPanel>
+        </Border>
+
+        <!-- Zen Mode Audio & Safe Display Effects -->
+        <Border Style="{StaticResource FocusSettingsCardStyle}">
+            <StackPanel>
+                <TextBlock Text="Zen mode &amp; display safety"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"
+                           Margin="0,0,0,10" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Off" Tag="None" Click="OnNoiseSelected" Style="{StaticResource FocusSettingsButtonStyle}" Margin="0,0,6,0" />
+                    <Button Content="White noise" Tag="White" Click="OnNoiseSelected" Style="{StaticResource FocusSettingsButtonStyle}" Margin="0,0,6,0" />
+                    <Button Content="Pink noise" Tag="Pink" Click="OnNoiseSelected" Style="{StaticResource FocusSettingsButtonStyle}" Margin="0,0,6,0" />
+                    <Button Content="Brown noise" Tag="Brown" Click="OnNoiseSelected" Style="{StaticResource FocusSettingsButtonStyle}" />
+                </StackPanel>
+
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Ambient noise volume" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding NoiseVolumePercent, Mode=TwoWay}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding NoiseVolumeLabel}" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                </Grid>
+
+                <CheckBox x:Name="GrayscaleCheck"
+                          Content="Apply DWM grayscale color filter during Focus sessions"
+                          IsChecked="{Binding IsGrayscaleEnabled, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Margin="0,0,0,8"
+                          Checked="OnDisplayOptionToggled"
+                          Unchecked="OnDisplayOptionToggled" />
+
+                <CheckBox x:Name="DimCheck"
+                          Content="Apply ambient display dimming during Focus sessions"
+                          IsChecked="{Binding IsDimEnabled, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Margin="0,0,0,8"
+                          Checked="OnDisplayOptionToggled"
+                          Unchecked="OnDisplayOptionToggled" />
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Dimming strength" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                    <Slider Grid.Column="1" Minimum="10" Maximum="75" Value="{Binding DimOpacityPercent, Mode=TwoWay}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding DimOpacityLabel}" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" />
+                </Grid>
+
+                <CheckBox x:Name="PauseFullscreenCheck"
+                          Content="Automatically pause screen effects during fullscreen apps or games"
+                          IsChecked="{Binding PauseScreenEffectOnFullscreen, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Margin="0,0,0,12"
+                          Checked="OnDisplayOptionToggled"
+                          Unchecked="OnDisplayOptionToggled" />
+
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Restore display to normal"
+                            Style="{StaticResource FocusSettingsButtonStyle}"
+                            Click="OnVerifyRestoreDisplayClicked"
+                            AutomationProperties.Name="Restore display color and brightness to normal" />
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextMuted}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

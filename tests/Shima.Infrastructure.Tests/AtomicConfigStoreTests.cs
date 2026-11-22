@@ -120,7 +120,7 @@ public sealed class SqliteMigrationRunnerTests : TempDirectoryTest
             }
         }
 
-        appliedVersions.Should().Equal(1, 2, 3, 4, 5);
+        appliedVersions.Should().Equal(1, 2, 3, 4, 5, 6);
 
         foreach (var expectedTable in new[]
                  {
@@ -128,7 +128,8 @@ public sealed class SqliteMigrationRunnerTests : TempDirectoryTest
                      "world_clock_locations",
                      "notes",
                      "clipboard_entries",
-                     "inbox_notifications"
+                     "inbox_notifications",
+                     "focus_sessions"
                  })
         {
             await using var checkTable = connection.CreateCommand();

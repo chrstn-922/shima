@@ -82,8 +82,18 @@ public partial class SettingsWindow : Window
 
         await RefreshWidgetsPanelAsync().ConfigureAwait(true);
         RefreshClockSettingsHost();
+        RefreshFocusTimerSettingsHost();
         RefreshNotificationSettingsHost();
         RefreshClipboardSettingsHost();
+    }
+
+    private void RefreshFocusTimerSettingsHost()
+    {
+        var focusSettingsView = _widgetCoordinator?.CreateSettingsView("shima.focus");
+        FocusTimerSettingsHost.Content = focusSettingsView;
+        FocusSettingsPlaceholderCard.Visibility = focusSettingsView is null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void RefreshClockSettingsHost()
@@ -157,6 +167,10 @@ public partial class SettingsWindow : Window
         else if (string.Equals(tag, "Clock", StringComparison.Ordinal))
         {
             RefreshClockSettingsHost();
+        }
+        else if (string.Equals(tag, "FocusTimer", StringComparison.Ordinal))
+        {
+            RefreshFocusTimerSettingsHost();
         }
         else if (string.Equals(tag, "Notifications", StringComparison.Ordinal))
         {
@@ -816,6 +830,7 @@ public partial class SettingsWindow : Window
 
     private void OnSettingsClosed(object? sender, EventArgs e)
     {
+        FocusTimerSettingsHost.Content = null;
         ClockSettingsHost.Content = null;
         InboxSettingsHost.Content = null;
         ClipboardSettingsHost.Content = null;

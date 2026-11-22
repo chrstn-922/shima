@@ -17,6 +17,7 @@ using Shima.Presentation.Shell;
 using Shima.Presentation.Theming;
 using Shima.Widgets.Clipboard;
 using Shima.Widgets.Clock;
+using Shima.Widgets.FocusTimer;
 using Shima.Widgets.Inbox;
 using Shima.Widgets.Notes;
 using Shima.Widgets.NowPlaying;
@@ -27,6 +28,7 @@ using Shima.WindowsInterop.Media;
 using Shima.WindowsInterop.Notifications;
 using Shima.WindowsInterop.Overlay;
 using Shima.WindowsInterop.System;
+using Shima.WindowsInterop.Zen;
 
 namespace Shima.App;
 
@@ -67,6 +69,15 @@ public partial class App : Application
 
             _serviceProvider = services.BuildServiceProvider();
             _logger = _serviceProvider.GetRequiredService<ILogger>();
+
+            var zenDisplayEffect = _serviceProvider.GetRequiredService<IZenDisplayEffectAdapter>();
+            if (zenDisplayEffect.RecoverFromStartupIfNeeded())
+            {
+                _logger.Warn("Recovered Zen display filter cleanly from runtime journal after unexpected termination.");
+            }
+
+            AppDomain.CurrentDomain.UnhandledException += OnUnhandledDomainException;
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
 
             var migrationRunner = _serviceProvider.GetRequiredService<SqliteMigrationRunner>();
             await migrationRunner.InitializeAsync().ConfigureAwait(true);
@@ -189,6 +200,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        AppDomain.CurrentDomain.UnhandledException -= OnUnhandledDomainException;
+        DispatcherUnhandledException -= OnDispatcherUnhandledException;
         _openSettingsSubscription?.Dispose();
         _openSettingsSubscription = null;
 
@@ -210,6 +223,9 @@ public partial class App : Application
         {
             try
             {
+                _serviceProvider.GetService<IZenAudioSynthAdapter>()?.Stop();
+                _serviceProvider.GetService<IZenDisplayEffectAdapter>()?.MarkCleanExit();
+
                 var window = _serviceProvider.GetService<IslandWindow>();
                 var clipboardMonitor = _serviceProvider.GetService<IClipboardMonitorAdapter>();
                 if (window is not null && clipboardMonitor is not null)
@@ -235,6 +251,25 @@ public partial class App : Application
         _singleInstanceGuard = null;
 
         base.OnExit(e);
+    }
+
+    private void OnUnhandledDomainException(object sender, UnhandledExceptionEventArgs e) =>
+        RestoreZenHardwareSafely();
+
+    private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e) =>
+        RestoreZenHardwareSafely();
+
+    private void RestoreZenHardwareSafely()
+    {
+        try
+        {
+            _serviceProvider?.GetService<IZenAudioSynthAdapter>()?.Stop();
+            _serviceProvider?.GetService<IZenDisplayEffectAdapter>()?.RestoreDisplay();
+        }
+        catch
+        {
+            // Never throw inside unhandled exception display recovery hooks.
+        }
     }
 
     private void ShowOrActivateSettings(string? sectionTag)
@@ -343,6 +378,7 @@ public partial class App : Application
         services.AddSingleton<INoteRepository>(_ => new NoteRepository(databasePath));
         services.AddSingleton<IClipboardRepository>(_ => new ClipboardRepository(databasePath, dataRoot));
         services.AddSingleton<IInboxRepository>(_ => new InboxRepository(databasePath, dataRoot));
+        services.AddSingleton<IFocusRepository>(_ => new FocusRepository(databasePath));
 
         services.AddSingleton<IEventDispatcher, InMemoryEventDispatcher>();
         services.AddSingleton<IOverlayPinController, OverlayPinController>();
@@ -352,6 +388,8 @@ public partial class App : Application
         services.AddSingleton<IAudioMixerAdapter, AudioMixerAdapter>();
         services.AddSingleton<IClipboardMonitorAdapter, ClipboardMonitorAdapter>();
         services.AddSingleton<INotificationListenerAdapter, NotificationListenerAdapter>();
+        services.AddSingleton<IZenAudioSynthAdapter>(sp => new ZenAudioSynthAdapter(sp.GetRequiredService<ILogger>()));
+        services.AddSingleton<IZenDisplayEffectAdapter>(sp => new ZenDisplayEffectAdapter(dataRoot, sp.GetRequiredService<ILogger>()));
 
         services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(sp =>
         [
@@ -376,6 +414,21 @@ public partial class App : Application
                     DefaultAccentHex = "#34D399"
                 },
                 () => new NowPlayingWidgetModule(sp.GetRequiredService<IMediaSessionAdapter>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = FocusTimerWidgetModule.Id,
+                    DisplayName = "Focus Timer",
+                    DefaultOrder = 2,
+                    RequiresBackgroundSubscription = false,
+                    SupportsCompactActiveState = true,
+                    SupportsNotificationPeek = true,
+                    DefaultAccentHex = "#FB923C"
+                },
+                () => new FocusTimerWidgetModule(
+                    sp.GetRequiredService<IFocusRepository>(),
+                    sp.GetRequiredService<IZenAudioSynthAdapter>(),
+                    sp.GetRequiredService<IZenDisplayEffectAdapter>())),
             new WidgetModuleRegistration(
                 new WidgetDescriptor
                 {

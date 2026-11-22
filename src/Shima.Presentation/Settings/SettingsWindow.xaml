@@ -487,7 +487,9 @@
                     <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Focus Timer" />
                     <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Pomodoro focus cadence and Zen display dimming configuration." />
 
-                    <Border Style="{StaticResource SettingsCardStyle}">
+                    <ContentPresenter x:Name="FocusTimerSettingsHost" />
+
+                    <Border x:Name="FocusSettingsPlaceholderCard" Style="{StaticResource SettingsCardStyle}">
                         <StackPanel>
                             <TextBlock Text="Focus &amp; Zen display presets"
                                        FontFamily="{DynamicResource ShimaFontFamily}"

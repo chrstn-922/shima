@@ -2,7 +2,7 @@
 
 Shima is a Windows Dynamic Island desktop companion. It sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
 
-**Status: Phases 1–7 complete (T001–T044 done). Phase 8 (T045–T048) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v5 migrations), atomic config storage, the widget registry, island state and pinning, Win32/WinRT/CoreAudio overlay, media, mixer, clipboard, and notification listener adapters, the WPF island shell with custom compact active pills and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, World Clock (`shima.clock`), Now Playing (`shima.music`), Notes (`shima.notes`), Inbox (`shima.inbox`), Clipboard (`shima.clipboard`), and Volume Mixer (`shima.mixer`). The Release build passes with 0 warnings and 0 errors across 130 unit, persistence, interop, widget, and FlaUI tests. Focus Timer & Zen Mode are next.
+**Status: Phases 1–8 complete (T001–T048 done). Phase 9 (T049–T053) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v6 migrations), atomic config and `runtime-journal.json` recovery storage, the widget registry, island state and pinning, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, and Zen audio/display adapters, the WPF island shell with custom compact active pills and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, World Clock (`shima.clock`), Now Playing (`shima.music`), Focus Timer & Zen Mode (`shima.focus`), Notes (`shima.notes`), Inbox (`shima.inbox`), Clipboard (`shima.clipboard`), and Volume Mixer (`shima.mixer`). The Release build passes with 0 warnings and 0 errors across 137 unit, persistence, interop, widget, and FlaUI tests. Developer Activity integrations are next.
 
 ## Features
 
@@ -91,8 +91,8 @@ Order and milestones come from [development-roadmap.md](docs/blueprint/developme
 | 5. Clock widget | T029–T032 | M3 | Done |
 | 6. Now Playing + Volume Mixer | T033–T037 | M3 | Done |
 | 7. Notes + Clipboard + Inbox | T038–T044 | M4 | Done |
-| 8. Focus Timer + Zen Mode | T045–T048 | M3 | Next |
-| 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Not started |
+| 8. Focus Timer + Zen Mode | T045–T048 | M3 | Done |
+| 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Next |
 | 10. Packaging, signing, release verification | T054–T056 | M6 | Not started |
 
-Next step: Phase 8 (`T045–T048`), starting with Pomodoro state-machine, DSP noise generator, and `runtime-journal.json` crash-recovery tests before implementing `FocusRepository`, `ZenAudioSynthAdapter`, `ZenDisplayEffectAdapter`, and `FocusTimerWidgetModule`.
+Next step: Phase 9 (`T049–T053`), starting with `ClaudeCodeAdapter`, `OpenCodeAdapter`, and `DeveloperWidgetModule` unit/contract tests in `tests/Shima.WindowsInterop.Tests/CodingAgentAdaptersTests.cs` before implementing `Shima.AgentBridge`, the coding-agent adapters, `AgentSessionLogRepository`, and `DeveloperWidgetModule`.

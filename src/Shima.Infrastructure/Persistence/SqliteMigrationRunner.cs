@@ -94,6 +94,23 @@ public sealed class SqliteMigrationRunner
                 ON inbox_notifications (received_at_utc DESC);
             CREATE INDEX IF NOT EXISTS idx_inbox_os_toast_id
                 ON inbox_notifications (os_toast_id);
+            """),
+        new SqliteMigration(
+            6,
+            "focus_sessions",
+            """
+            CREATE TABLE IF NOT EXISTS focus_sessions (
+                session_id TEXT PRIMARY KEY,
+                phase_type TEXT NOT NULL CHECK (phase_type IN ('Work', 'ShortBreak', 'LongBreak')),
+                planned_seconds INTEGER NOT NULL CHECK (planned_seconds > 0),
+                completed_seconds INTEGER NOT NULL CHECK (completed_seconds >= 0),
+                zen_noise_type TEXT NOT NULL CHECK (zen_noise_type IN ('None', 'White', 'Pink', 'Brown')),
+                screen_effect_used INTEGER NOT NULL DEFAULT 0 CHECK (screen_effect_used IN (0, 1)),
+                started_at_utc TEXT NOT NULL,
+                ended_at_utc TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_focus_sessions_started_at
+                ON focus_sessions (started_at_utc DESC);
             """)
     ];
 
