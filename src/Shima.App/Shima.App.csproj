@@ -20,9 +20,21 @@
     <ProjectReference Include="..\Shima.Widgets\Shima.Widgets.Clipboard\Shima.Widgets.Clipboard.csproj" />
     <ProjectReference Include="..\Shima.Widgets\Shima.Widgets.VolumeMixer\Shima.Widgets.VolumeMixer.csproj" />
     <ProjectReference Include="..\Shima.Widgets\Shima.Widgets.Developer\Shima.Widgets.Developer.csproj" />
+    <ProjectReference Include="..\Shima.AgentBridge\Shima.AgentBridge.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
   </ItemGroup>
+
+  <Target Name="CopyAgentBridgeOutputs" AfterTargets="Build">
+    <ItemGroup>
+      <AgentBridgeFiles Include="..\Shima.AgentBridge\bin\$(Configuration)\$(TargetFramework)\Shima.AgentBridge.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AgentBridgeFiles)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

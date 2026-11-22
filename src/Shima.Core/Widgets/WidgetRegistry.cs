@@ -292,6 +292,87 @@ public sealed class WidgetRegistry : IAsyncDisposable
         }
     }
 
+    public object? CreateCollapsedStatusView(string widgetId)
+    {
+        var entry = GetEntry(widgetId);
+        var instance = entry.Instance;
+        if (instance is not ICollapsedStatusViewProvider provider || entry.IsFaulted)
+        {
+            return null;
+        }
+
+        var config = entry.Config;
+        if (config is not null && !config.IsEnabled)
+        {
+            return null;
+        }
+
+        try
+        {
+            return provider.CreateCollapsedStatusView();
+        }
+        catch (Exception exception)
+        {
+            MarkFaulted(entry, nameof(ICollapsedStatusViewProvider.CreateCollapsedStatusView), exception);
+            return null;
+        }
+    }
+
+    public string? ResolveAutoSelectWidgetIdOnExpand()
+    {
+        foreach (var entry in SnapshotEntries().OrderBy(e => e.Config?.SortOrder ?? e.Registration.Metadata.DefaultOrder))
+        {
+            if (entry.IsFaulted || entry.Config is { IsEnabled: false })
+            {
+                continue;
+            }
+
+            if (entry.Instance is not IExpandAutoSelectProvider provider)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (provider.ShouldAutoSelectOnExpand)
+                {
+                    return entry.WidgetId;
+                }
+            }
+            catch (Exception exception)
+            {
+                MarkFaulted(entry, nameof(IExpandAutoSelectProvider.ShouldAutoSelectOnExpand), exception);
+            }
+        }
+
+        return null;
+    }
+
+    public void NotifyCollapsedNotchHovered()
+    {
+        foreach (var entry in SnapshotEntries())
+        {
+            if (entry.IsFaulted || entry.Config is { IsEnabled: false })
+            {
+                continue;
+            }
+
+            if (entry.Instance is not IExpandAutoSelectProvider provider)
+            {
+                continue;
+            }
+
+            try
+            {
+                provider.OnCollapsedNotchHovered();
+            }
+            catch (Exception exception)
+            {
+                MarkFaulted(entry, nameof(IExpandAutoSelectProvider.OnCollapsedNotchHovered), exception);
+            }
+        }
+    }
+
     public void OnShellStateChanged(IslandShellState newState)
     {
         foreach (var entry in SnapshotEntries())
@@ -609,6 +690,9 @@ public sealed class WidgetRegistry : IAsyncDisposable
 
         public void UpdateCompactPill(string? targetWidgetId, string? badgeText) =>
             inner.UpdateCompactPill(targetWidgetId ?? widgetId, badgeText);
+
+        public void UpdateCompactPill(string? targetWidgetId, string? badgeText, CompactPillPriority priority) =>
+            inner.UpdateCompactPill(targetWidgetId ?? widgetId, badgeText, priority);
     }
 
     private sealed class WidgetSettingsStore : IWidgetSettingsStore

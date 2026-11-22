@@ -85,6 +85,12 @@ public partial class SettingsWindow : Window
         RefreshFocusTimerSettingsHost();
         RefreshNotificationSettingsHost();
         RefreshClipboardSettingsHost();
+        RefreshDeveloperSettingsHost();
+    }
+
+    private void RefreshDeveloperSettingsHost()
+    {
+        DeveloperSettingsHost.Content = _widgetCoordinator?.CreateSettingsView("shima.developer");
     }
 
     private void RefreshFocusTimerSettingsHost()
@@ -179,6 +185,10 @@ public partial class SettingsWindow : Window
         else if (string.Equals(tag, "Clipboard", StringComparison.Ordinal))
         {
             RefreshClipboardSettingsHost();
+        }
+        else if (string.Equals(tag, "DeveloperIntegrations", StringComparison.Ordinal))
+        {
+            RefreshDeveloperSettingsHost();
         }
         else if (string.Equals(tag, "General", StringComparison.Ordinal))
         {

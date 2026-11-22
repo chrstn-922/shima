@@ -39,6 +39,9 @@ public interface IIslandAttentionRequester
     void UpdateCompactPill(string? badgeText);
 
     void UpdateCompactPill(string? widgetId, string? badgeText) => UpdateCompactPill(badgeText);
+
+    void UpdateCompactPill(string? widgetId, string? badgeText, CompactPillPriority priority) =>
+        UpdateCompactPill(widgetId, badgeText);
 }
 
 public interface IThemeTokenProvider

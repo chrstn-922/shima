@@ -2,7 +2,7 @@
 
 Shima is a Windows Dynamic Island desktop companion. It sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
 
-**Status: Phases 1–8 complete (T001–T048 done). Phase 9 (T049–T053) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v6 migrations), atomic config and `runtime-journal.json` recovery storage, the widget registry, island state and pinning, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, and Zen audio/display adapters, the WPF island shell with custom compact active pills and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, World Clock (`shima.clock`), Now Playing (`shima.music`), Focus Timer & Zen Mode (`shima.focus`), Notes (`shima.notes`), Inbox (`shima.inbox`), Clipboard (`shima.clipboard`), and Volume Mixer (`shima.mixer`). The Release build passes with 0 warnings and 0 errors across 137 unit, persistence, interop, widget, and FlaUI tests. Developer Activity integrations are next.
+**Status: Phases 1–9 complete (T001–T053 done). Phase 10 (T054–T056) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v7 migrations including `agent_session_logs`), atomic config and `runtime-journal.json` recovery storage, the widget registry, island state and pinning with multi-widget compact pill coexistence, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, Zen audio/display adapters, `Shima.AgentBridge`, and independent opt-in `ClaudeCodeAdapter` and `OpenCodeAdapter` coding-agent adapters, the WPF island shell with collapsed notch status indicator and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, World Clock (`shima.clock`), Now Playing (`shima.music`), Focus Timer & Zen Mode (`shima.focus`), Notes (`shima.notes`), Inbox (`shima.inbox`), Clipboard (`shima.clipboard`), Volume Mixer (`shima.mixer`), and Developer Activity (`shima.developer`). The Release build passes with 0 warnings and 0 errors across 156 unit, persistence, interop, widget, and FlaUI tests. Packaging, signing, and release verification are next.
 
 ## Features
 
@@ -92,7 +92,7 @@ Order and milestones come from [development-roadmap.md](docs/blueprint/developme
 | 6. Now Playing + Volume Mixer | T033–T037 | M3 | Done |
 | 7. Notes + Clipboard + Inbox | T038–T044 | M4 | Done |
 | 8. Focus Timer + Zen Mode | T045–T048 | M3 | Done |
-| 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Next |
-| 10. Packaging, signing, release verification | T054–T056 | M6 | Not started |
+| 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Done |
+| 10. Packaging, signing, release verification | T054–T056 | M6 | Next |
 
-Next step: Phase 9 (`T049–T053`), starting with `ClaudeCodeAdapter`, `OpenCodeAdapter`, and `DeveloperWidgetModule` unit/contract tests in `tests/Shima.WindowsInterop.Tests/CodingAgentAdaptersTests.cs` before implementing `Shima.AgentBridge`, the coding-agent adapters, `AgentSessionLogRepository`, and `DeveloperWidgetModule`.
+Next step: Phase 10 (`T054–T056`) for `UpdateServiceAdapter`, offline-first `LicenseServiceAdapter`, Sparse MSIX `AppxManifest.xml`, Velopack build/sign scripts, and final release verification gates.

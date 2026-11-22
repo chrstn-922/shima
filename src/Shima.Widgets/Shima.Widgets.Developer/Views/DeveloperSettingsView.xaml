@@ -1,0 +1,156 @@
+<UserControl x:Class="Shima.Widgets.Developer.Views.DeveloperSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Developer Activity adapter diagnostics">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="DevSettingsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsCard}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="DevSettingsButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <ItemsControl ItemsSource="{Binding Diagnostics}"
+                      AutomationProperties.AutomationId="DeveloperDiagnosticsList">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource DevSettingsCardStyle}">
+                        <StackPanel>
+                            <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="{Binding DisplayName}"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}" />
+
+                                <Border DockPanel.Dock="Right"
+                                        Background="{DynamicResource SurfaceSettingsInput}"
+                                        BorderBrush="{DynamicResource SettingsBorderSubtle}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="8,2">
+                                    <TextBlock Text="{Binding HealthStatusLabel}"
+                                               FontFamily="{DynamicResource ShimaFontFamily}"
+                                               FontSize="11.5"
+                                               Foreground="{DynamicResource TextPrimary}" />
+                                </Border>
+                            </DockPanel>
+
+                            <TextBlock Text="{Binding CapabilitySummary}"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,6" />
+
+                            <Border Visibility="{Binding IsAuthenticationRequired, Converter={StaticResource BoolToVis}}"
+                                    Background="{DynamicResource WarningBannerSurface}"
+                                    BorderBrush="{DynamicResource WarningBannerBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="10,6"
+                                    Margin="0,0,0,8">
+                                <TextBlock Text="Authentication required: verify the OpenCode server password saved above (HTTP 401 rejected)."
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource WarningBannerText}"
+                                           TextWrapping="Wrap" />
+                            </Border>
+
+                            <TextBlock Text="{Binding HealthMessage}"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,10" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Button Content="{Binding InstallButtonLabel}"
+                                        Style="{StaticResource DevSettingsButtonStyle}"
+                                        Margin="0,0,6,0"
+                                        Tag="{Binding AdapterId}"
+                                        Click="OnInstallClicked" />
+                                <Button Content="{Binding UninstallButtonLabel}"
+                                        Style="{StaticResource DevSettingsButtonStyle}"
+                                        Margin="0,0,6,0"
+                                        Tag="{Binding AdapterId}"
+                                        Click="OnUninstallClicked" />
+                                <Button Content="Check health"
+                                        Style="{StaticResource DevSettingsButtonStyle}"
+                                        Tag="{Binding AdapterId}"
+                                        Click="OnCheckHealthClicked" />
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding HasUnsupportedCapabilities, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Documented boundaries &amp; unsupported capabilities:"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="11.5"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,0,0,4" />
+                                <ItemsControl ItemsSource="{Binding UnsupportedCapabilities}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='• {0}'}"
+                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextMuted}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,2" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="{Binding SettingsFeedbackMessage}"
+                   FontFamily="{DynamicResource ShimaFontFamily}"
+                   FontSize="12"
+                   Foreground="{DynamicResource TextMuted}"
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>

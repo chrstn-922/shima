@@ -17,11 +17,13 @@ using Shima.Presentation.Shell;
 using Shima.Presentation.Theming;
 using Shima.Widgets.Clipboard;
 using Shima.Widgets.Clock;
+using Shima.Widgets.Developer;
 using Shima.Widgets.FocusTimer;
 using Shima.Widgets.Inbox;
 using Shima.Widgets.Notes;
 using Shima.Widgets.NowPlaying;
 using Shima.Widgets.VolumeMixer;
+using Shima.WindowsInterop.Agents;
 using Shima.WindowsInterop.Audio;
 using Shima.WindowsInterop.Clipboard;
 using Shima.WindowsInterop.Media;
@@ -41,6 +43,8 @@ public partial class App : Application
     private ILogger? _logger;
     private SettingsWindow? _settingsWindow;
     private IDisposable? _openSettingsSubscription;
+    private IDisposable? _collapsedIndicatorSubscription;
+    private IDisposable? _collapsedHoveredSubscription;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -90,9 +94,39 @@ public partial class App : Application
             await appearanceManager.InitializeAsync().ConfigureAwait(true);
 
             var widgetRegistry = _serviceProvider.GetRequiredService<WidgetRegistry>();
+            var eventDispatcher = _serviceProvider.GetRequiredService<IEventDispatcher>();
+            var islandWindow = _serviceProvider.GetRequiredService<IslandWindow>();
+
+            void SyncCollapsedStatusView()
+            {
+                var devWidget = widgetRegistry.Widgets.FirstOrDefault(w =>
+                    string.Equals(w.Metadata.WidgetId, DeveloperWidgetModule.Id, StringComparison.Ordinal)
+                    && w.IsEnabled
+                    && !w.IsFaulted);
+                var statusView = devWidget is not null
+                    ? widgetRegistry.CreateCollapsedStatusView(DeveloperWidgetModule.Id)
+                    : null;
+                islandWindow.SetCollapsedStatusContent(statusView);
+            }
+
+            _collapsedIndicatorSubscription = eventDispatcher.Subscribe<CollapsedStatusIndicatorChangedEvent>(
+                evt => Dispatcher.BeginInvoke(() =>
+                {
+                    if (!evt.IsVisible)
+                    {
+                        islandWindow.SetCollapsedStatusContent(null);
+                    }
+                    else
+                    {
+                        islandWindow.SetCollapsedStatusContent(widgetRegistry.CreateCollapsedStatusView(evt.WidgetId));
+                    }
+                }));
+
+            _collapsedHoveredSubscription = eventDispatcher.Subscribe<IslandCollapsedHoveredEvent>(
+                _ => widgetRegistry.NotifyCollapsedNotchHovered());
+
             await widgetRegistry.InitializeAsync().ConfigureAwait(true);
 
-            var islandWindow = _serviceProvider.GetRequiredService<IslandWindow>();
             var themeRenderer = _serviceProvider.GetRequiredService<ThemeRenderer>();
             if (Current?.Resources is not null)
             {
@@ -105,11 +139,11 @@ public partial class App : Application
 
             ApplyPreferencesToShell(islandWindow, preferences);
             SyncIslandWidgetSlots(islandWindow, widgetRegistry);
+            SyncCollapsedStatusView();
 
             var stateManager = _serviceProvider.GetRequiredService<IIslandStateManager>();
             var powerMonitor = _serviceProvider.GetRequiredService<IPowerAndMotionMonitor>();
             var coordinator = _serviceProvider.GetRequiredService<WidgetRegistrySettingsCoordinator>();
-            var eventDispatcher = _serviceProvider.GetRequiredService<IEventDispatcher>();
 
             object? cachedCompactView = null;
             string? cachedCompactWidgetId = null;
@@ -137,6 +171,10 @@ public partial class App : Application
             SyncCompactActiveView();
             stateManager.CompactPillUpdated += (_, _) => Dispatcher.BeginInvoke(SyncCompactActiveView);
 
+            string? lastManualWidgetId = islandWindow.WidgetHost.SelectedWidgetId ?? widgetRegistry.ActiveWidgetId;
+            string? autoSwitchedWidgetId = null;
+            var suppressManualTracking = false;
+
             stateManager.StateChanged += (_, args) =>
             {
                 widgetRegistry.OnShellStateChanged(args.NewState);
@@ -144,6 +182,38 @@ public partial class App : Application
                 {
                     Dispatcher.BeginInvoke(() =>
                     {
+                        var autoSelectId = widgetRegistry.ResolveAutoSelectWidgetIdOnExpand();
+                        if (!string.IsNullOrWhiteSpace(autoSelectId))
+                        {
+                            suppressManualTracking = true;
+                            try
+                            {
+                                autoSwitchedWidgetId = autoSelectId;
+                                islandWindow.WidgetHost.SelectWidget(autoSelectId);
+                            }
+                            finally
+                            {
+                                suppressManualTracking = false;
+                            }
+                        }
+                        else if (autoSwitchedWidgetId is not null)
+                        {
+                            var restoreId = lastManualWidgetId ?? islandWindow.WidgetHost.SelectedWidgetId;
+                            autoSwitchedWidgetId = null;
+                            if (!string.IsNullOrWhiteSpace(restoreId))
+                            {
+                                suppressManualTracking = true;
+                                try
+                                {
+                                    islandWindow.WidgetHost.SelectWidget(restoreId);
+                                }
+                                finally
+                                {
+                                    suppressManualTracking = false;
+                                }
+                            }
+                        }
+
                         var selectedId = islandWindow.WidgetHost.SelectedWidgetId ?? widgetRegistry.ActiveWidgetId;
                         if (!string.IsNullOrWhiteSpace(selectedId))
                         {
@@ -155,7 +225,15 @@ public partial class App : Application
 
             powerMonitor.PowerProfileChanged += (_, profile) => widgetRegistry.OnPowerProfileChanged(profile);
             islandWindow.WidgetHost.SelectedWidgetChanged += (_, widgetId) =>
+            {
+                if (!suppressManualTracking)
+                {
+                    lastManualWidgetId = widgetId;
+                    autoSwitchedWidgetId = null;
+                }
+
                 _ = widgetRegistry.ActivateAsync(widgetId, WidgetActivationReason.UserSelection);
+            };
             coordinator.WidgetsChanged += (_, _) =>
                 Dispatcher.BeginInvoke(() =>
                 {
@@ -163,6 +241,7 @@ public partial class App : Application
                     cachedCompactView = null;
                     SyncIslandWidgetSlots(islandWindow, widgetRegistry);
                     SyncCompactActiveView();
+                    SyncCollapsedStatusView();
                 });
             _openSettingsSubscription = eventDispatcher.Subscribe<OpenSettingsRequestedEvent>(
                 evt => Dispatcher.BeginInvoke(() => ShowOrActivateSettings(evt.SectionTag)));
@@ -204,6 +283,10 @@ public partial class App : Application
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
         _openSettingsSubscription?.Dispose();
         _openSettingsSubscription = null;
+        _collapsedIndicatorSubscription?.Dispose();
+        _collapsedIndicatorSubscription = null;
+        _collapsedHoveredSubscription?.Dispose();
+        _collapsedHoveredSubscription = null;
 
         if (_settingsWindow is not null)
         {
@@ -379,6 +462,7 @@ public partial class App : Application
         services.AddSingleton<IClipboardRepository>(_ => new ClipboardRepository(databasePath, dataRoot));
         services.AddSingleton<IInboxRepository>(_ => new InboxRepository(databasePath, dataRoot));
         services.AddSingleton<IFocusRepository>(_ => new FocusRepository(databasePath));
+        services.AddSingleton<IAgentSessionLogRepository>(_ => new AgentSessionLogRepository(databasePath));
 
         services.AddSingleton<IEventDispatcher, InMemoryEventDispatcher>();
         services.AddSingleton<IOverlayPinController, OverlayPinController>();
@@ -390,6 +474,13 @@ public partial class App : Application
         services.AddSingleton<INotificationListenerAdapter, NotificationListenerAdapter>();
         services.AddSingleton<IZenAudioSynthAdapter>(sp => new ZenAudioSynthAdapter(sp.GetRequiredService<ILogger>()));
         services.AddSingleton<IZenDisplayEffectAdapter>(sp => new ZenDisplayEffectAdapter(dataRoot, sp.GetRequiredService<ILogger>()));
+        services.AddSingleton<ClaudeCodeAdapter>();
+        services.AddSingleton<OpenCodeAdapter>();
+        services.AddSingleton<IEnumerable<ICodingAgentAdapter>>(sp =>
+        [
+            sp.GetRequiredService<ClaudeCodeAdapter>(),
+            sp.GetRequiredService<OpenCodeAdapter>()
+        ]);
 
         services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(sp =>
         [
@@ -484,7 +575,22 @@ public partial class App : Application
                     SupportsNotificationPeek = false,
                     DefaultAccentHex = "#38BDF8"
                 },
-                () => new VolumeMixerWidgetModule(sp.GetRequiredService<IAudioMixerAdapter>()))
+                () => new VolumeMixerWidgetModule(sp.GetRequiredService<IAudioMixerAdapter>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = DeveloperWidgetModule.Id,
+                    DisplayName = "Developer Activity",
+                    DefaultOrder = 7,
+                    RequiresBackgroundSubscription = true,
+                    SupportsCompactActiveState = true,
+                    SupportsNotificationPeek = true,
+                    DefaultAccentHex = "#38BDF8"
+                },
+                () => new DeveloperWidgetModule(
+                    sp.GetRequiredService<IEnumerable<ICodingAgentAdapter>>().ToArray(),
+                    sp.GetRequiredService<IAgentSessionLogRepository>(),
+                    sp.GetRequiredService<IAppPreferencesService>()))
         ]);
         services.AddSingleton<WidgetRegistry>();
         services.AddSingleton<WidgetRegistrySettingsCoordinator>();

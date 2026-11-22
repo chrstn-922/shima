@@ -77,6 +77,12 @@
               StrokeThickness="1"
               Stretch="None" />
 
+        <!-- Collapsed notch status indicator (e.g., opt-in Developer Activity bar) -->
+        <ContentPresenter x:Name="CollapsedOverlayContentPresenter"
+                          Margin="20,0,20,7"
+                          VerticalAlignment="Bottom"
+                          Visibility="Collapsed" />
+
         <!-- Compact active pill content -->
         <Grid x:Name="ActiveLayer"
               Margin="18,4,18,4"
@@ -128,14 +134,35 @@
                            TextTrimming="CharacterEllipsis" />
             </StackPanel>
 
-            <Button x:Name="DismissNotificationButton"
-                    Grid.Column="1"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource PillActionButtonStyle}"
-                    Content="Dismiss"
-                    Click="OnDismissNotificationClicked"
-                    AutomationProperties.Name="Dismiss notification"
-                    AutomationProperties.AutomationId="DismissNotificationButton" />
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="NotificationPrimaryActionButton"
+                        Margin="0,0,6,0"
+                        Style="{StaticResource PillActionButtonStyle}"
+                        BorderBrush="{DynamicResource AgentStatusWorkingBrush}"
+                        Foreground="{DynamicResource AgentStatusWorkingBrush}"
+                        Visibility="Collapsed"
+                        Click="OnNotificationPrimaryActionClicked"
+                        AutomationProperties.AutomationId="NotificationPrimaryActionButton" />
+
+                <Button x:Name="NotificationSecondaryActionButton"
+                        Margin="0,0,6,0"
+                        Style="{StaticResource PillActionButtonStyle}"
+                        BorderBrush="{DynamicResource AgentStatusErrorBrush}"
+                        Foreground="{DynamicResource AgentStatusErrorBrush}"
+                        Visibility="Collapsed"
+                        Click="OnNotificationSecondaryActionClicked"
+                        AutomationProperties.AutomationId="NotificationSecondaryActionButton" />
+
+                <Button x:Name="DismissNotificationButton"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource PillActionButtonStyle}"
+                        Content="Dismiss"
+                        Click="OnDismissNotificationClicked"
+                        AutomationProperties.Name="Dismiss notification"
+                        AutomationProperties.AutomationId="DismissNotificationButton" />
+            </StackPanel>
         </Grid>
 
         <!-- Expanded panel hosting widget carousel -->

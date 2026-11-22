@@ -18,6 +18,13 @@ public enum PowerProfile
     DisplayOff
 }
 
+public enum CompactPillPriority
+{
+    Background = 0,
+    Normal = 1,
+    Urgent = 2
+}
+
 public sealed record IslandStateChangedEventArgs(IslandShellState PreviousState, IslandShellState NewState);
 
 public interface IIslandStateManager
@@ -49,6 +56,9 @@ public interface IIslandStateManager
     void SetCompactActive(bool isActive, string? badgeText = null);
 
     void SetCompactActive(string? widgetId, bool isActive, string? badgeText = null);
+
+    void SetCompactActive(string? widgetId, bool isActive, string? badgeText, CompactPillPriority priority) =>
+        SetCompactActive(widgetId, isActive, badgeText);
 
     void RequestNotificationPeek(NotificationPriority priority, TimeSpan ttl);
 

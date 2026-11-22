@@ -1,0 +1,55 @@
+<UserControl x:Class="Shima.Widgets.Developer.Views.DeveloperCollapsedBarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dev="clr-namespace:Shima.Widgets.Developer"
+             AutomationProperties.Name="{Binding BarAccessibleStatus}"
+             AutomationProperties.AutomationId="DeveloperCollapsedBarView">
+    <UserControl.Resources>
+        <Style x:Key="CollapsedAgentBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Background" Value="{DynamicResource AgentStatusTrackBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AgentStatusIdleBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border x:Name="PART_Track"
+                                Height="4"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Height="4"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="2" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Idle}">
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusIdleBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Working}">
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusWorkingBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Attention}">
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusAttentionBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Finished}">
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.ErrorFailed}">
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusErrorBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ProgressBar Style="{StaticResource CollapsedAgentBarStyle}"
+                 Value="{Binding BarFillPercent, Mode=OneWay}"
+                 VerticalAlignment="Center"
+                 AutomationProperties.Name="{Binding BarAccessibleStatus}"
+                 AutomationProperties.AutomationId="DeveloperCollapsedProgressBar" />
+</UserControl>

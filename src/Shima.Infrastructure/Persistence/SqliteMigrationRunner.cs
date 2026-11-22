@@ -111,6 +111,22 @@ public sealed class SqliteMigrationRunner
             );
             CREATE INDEX IF NOT EXISTS idx_focus_sessions_started_at
                 ON focus_sessions (started_at_utc DESC);
+            """),
+        new SqliteMigration(
+            7,
+            "agent_session_logs",
+            """
+            CREATE TABLE IF NOT EXISTS agent_session_logs (
+                session_id TEXT PRIMARY KEY,
+                adapter_type TEXT NOT NULL CHECK (adapter_type IN ('ClaudeCode', 'OpenCode')),
+                workspace_path TEXT NOT NULL,
+                process_id INTEGER NULL,
+                last_status TEXT NOT NULL CHECK (last_status IN ('Working', 'NeedsAttention', 'AwaitingApproval', 'Finished')),
+                started_at_utc TEXT NOT NULL,
+                last_seen_at_utc TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_agent_session_logs_last_seen
+                ON agent_session_logs (last_seen_at_utc DESC);
             """)
     ];
 

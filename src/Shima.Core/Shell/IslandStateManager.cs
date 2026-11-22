@@ -10,9 +10,13 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
 {
     private static readonly TimeSpan DefaultNotificationTtl = TimeSpan.FromSeconds(5);
 
+    private const string DefaultCompactSlotKey = "__default__";
+
     private readonly object _sync = new();
     private readonly IOverlayPinController _pinController;
     private readonly ILogger? _logger;
+    private readonly Dictionary<string, CompactSlotEntry> _compactSlots = new(StringComparer.Ordinal);
+    private long _compactSequence;
 
     private IslandShellState _currentState = IslandShellState.Collapsed;
     private VisibilityPriority _currentPriority = VisibilityPriority.CollapsedIdle;
@@ -30,6 +34,12 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
     private string? _compactActiveWidgetId;
     private TimeSpan _currentNotificationTtl = DefaultNotificationTtl;
     private bool _disposed;
+
+    private sealed record CompactSlotEntry(
+        string? PublicWidgetId,
+        CompactPillPriority Priority,
+        string? BadgeText,
+        long Sequence);
 
     public IslandStateManager(IOverlayPinController pinController, ILogger? logger = null)
     {
@@ -237,29 +247,58 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
     }
 
     public void SetCompactActive(bool isActive, string? badgeText = null) =>
-        SetCompactActive(null, isActive, badgeText);
+        SetCompactActive(null, isActive, badgeText, CompactPillPriority.Normal);
 
-    public void SetCompactActive(string? widgetId, bool isActive, string? badgeText = null)
+    public void SetCompactActive(string? widgetId, bool isActive, string? badgeText = null) =>
+        SetCompactActive(widgetId, isActive, badgeText, CompactPillPriority.Normal);
+
+    public void SetCompactActive(
+        string? widgetId,
+        bool isActive,
+        string? badgeText,
+        CompactPillPriority priority)
     {
         IslandStateChangedEventArgs? change;
         bool pillChanged;
         lock (_sync)
         {
-            if (!isActive
-                && !string.IsNullOrWhiteSpace(widgetId)
-                && !string.IsNullOrWhiteSpace(_compactActiveWidgetId)
-                && !string.Equals(_compactActiveWidgetId, widgetId, StringComparison.Ordinal))
-            {
-                return;
-            }
+            var normalizedId = string.IsNullOrWhiteSpace(widgetId) ? null : widgetId;
+            var key = normalizedId ?? DefaultCompactSlotKey;
 
             var prevActive = _isCompactActive;
             var prevBadge = _compactPillBadgeText;
             var prevWidgetId = _compactActiveWidgetId;
 
-            _isCompactActive = isActive;
-            _compactPillBadgeText = isActive ? badgeText : null;
-            _compactActiveWidgetId = isActive ? widgetId : null;
+            if (isActive)
+            {
+                _compactSlots[key] = new CompactSlotEntry(
+                    normalizedId,
+                    priority,
+                    badgeText,
+                    ++_compactSequence);
+            }
+            else
+            {
+                _compactSlots.Remove(key);
+            }
+
+            if (_compactSlots.Count == 0)
+            {
+                _isCompactActive = false;
+                _compactPillBadgeText = null;
+                _compactActiveWidgetId = null;
+            }
+            else
+            {
+                var winner = _compactSlots.Values
+                    .OrderByDescending(slot => slot.Priority)
+                    .ThenByDescending(slot => slot.Sequence)
+                    .First();
+
+                _isCompactActive = true;
+                _compactPillBadgeText = winner.BadgeText;
+                _compactActiveWidgetId = winner.PublicWidgetId;
+            }
 
             pillChanged = prevActive != _isCompactActive
                 || !string.Equals(prevBadge, _compactPillBadgeText, StringComparison.Ordinal)

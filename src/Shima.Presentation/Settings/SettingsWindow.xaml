@@ -606,6 +606,8 @@
                                        AutomationProperties.AutomationId="OpenCodePasswordStateText" />
                         </StackPanel>
                     </Border>
+
+                    <ContentPresenter x:Name="DeveloperSettingsHost" />
                 </StackPanel>
 
                 <!-- 8. Appearance & Customization -->

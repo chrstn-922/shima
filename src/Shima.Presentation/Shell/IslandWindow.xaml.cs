@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -33,7 +34,11 @@ public partial class IslandWindow : Window
     private HwndSource? _hwndSource;
     private IDisposable? _inputFocusSubscription;
     private IDisposable? _notificationPeekContentSubscription;
+    private IDisposable? _notificationPeekDismissSubscription;
     private string? _activeNotificationWidgetId;
+    private string? _activeNotificationItemId;
+    private NotificationPeekAction? _primaryPeekAction;
+    private NotificationPeekAction? _secondaryPeekAction;
     private MonitorInfo _currentMonitor;
     private MonitorSelectionMode _monitorSelectionMode = MonitorSelectionMode.Primary;
     private string? _specificMonitorDeviceId;
@@ -111,7 +116,19 @@ public partial class IslandWindow : Window
                 evt => Dispatcher.BeginInvoke(() =>
                 {
                     _activeNotificationWidgetId = evt.WidgetId;
-                    SetNotificationContent(evt.Title, evt.Body);
+                    _activeNotificationItemId = evt.ItemId;
+                    SetNotificationContent(evt.Title, evt.Body, evt.PrimaryAction, evt.SecondaryAction);
+                }));
+
+            _notificationPeekDismissSubscription = _eventDispatcher.Subscribe<NotificationPeekDismissRequestedEvent>(
+                evt => Dispatcher.BeginInvoke(() =>
+                {
+                    if (string.Equals(_activeNotificationWidgetId, evt.WidgetId, StringComparison.Ordinal)
+                        && (evt.ItemId is null || string.Equals(_activeNotificationItemId, evt.ItemId, StringComparison.Ordinal)))
+                    {
+                        _notificationPeekTimer.Stop();
+                        _stateManager.ClearNotificationPeek();
+                    }
                 }));
         }
     }
@@ -160,10 +177,32 @@ public partial class IslandWindow : Window
         ActiveDefaultBadgePanel.Visibility = content is null ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    public void SetNotificationContent(string title, string body)
+    public void SetCollapsedStatusContent(object? content)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => SetCollapsedStatusContent(content));
+            return;
+        }
+
+        CollapsedOverlayContentPresenter.Content = content;
+        UpdateCollapsedOverlayVisibility(_renderedState);
+    }
+
+    public void SetNotificationContent(
+        string title,
+        string body,
+        NotificationPeekAction? primaryAction = null,
+        NotificationPeekAction? secondaryAction = null)
     {
         NotificationTitleText.Text = string.IsNullOrWhiteSpace(title) ? "Notification" : title;
         NotificationBodyText.Text = body ?? string.Empty;
+
+        _primaryPeekAction = primaryAction;
+        _secondaryPeekAction = secondaryAction;
+
+        ConfigurePeekActionButton(NotificationPrimaryActionButton, primaryAction);
+        ConfigurePeekActionButton(NotificationSecondaryActionButton, secondaryAction);
     }
 
     public void ApplyBehaviorPreferences(
@@ -255,6 +294,8 @@ public partial class IslandWindow : Window
         _inputFocusSubscription = null;
         _notificationPeekContentSubscription?.Dispose();
         _notificationPeekContentSubscription = null;
+        _notificationPeekDismissSubscription?.Dispose();
+        _notificationPeekDismissSubscription = null;
 
         _stateManager.StateChanged -= OnShellStateChanged;
         _stateManager.CompactPillUpdated -= OnCompactPillUpdated;
@@ -460,11 +501,36 @@ public partial class IslandWindow : Window
         ActiveLayer.Visibility = state == IslandShellState.Active ? Visibility.Visible : Visibility.Collapsed;
         NotificationLayer.Visibility = state == IslandShellState.Notification ? Visibility.Visible : Visibility.Collapsed;
         ExpandedLayer.Visibility = state == IslandShellState.Expanded ? Visibility.Visible : Visibility.Collapsed;
+        UpdateCollapsedOverlayVisibility(state);
 
         var surfaceBrushKey = state is IslandShellState.Expanded or IslandShellState.Notification
             ? "SurfaceExpanded"
             : "SurfaceCollapsed";
         NotchSurfacePath.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, surfaceBrushKey);
+    }
+
+    private void UpdateCollapsedOverlayVisibility(IslandShellState state)
+    {
+        CollapsedOverlayContentPresenter.Visibility = state == IslandShellState.Collapsed
+            && CollapsedOverlayContentPresenter.Content is not null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private static void ConfigurePeekActionButton(System.Windows.Controls.Button button, NotificationPeekAction? action)
+    {
+        if (action is null)
+        {
+            button.Visibility = Visibility.Collapsed;
+            button.Content = null;
+            button.IsEnabled = true;
+            return;
+        }
+
+        button.Content = action.Label;
+        AutomationProperties.SetName(button, action.AutomationName);
+        button.IsEnabled = true;
+        button.Visibility = Visibility.Visible;
     }
 
     private void ApplySurfaceGeometryAndAnchor(IslandShellState state, IslandVisualSpec targetSpec)
@@ -512,6 +578,11 @@ public partial class IslandWindow : Window
         if (TryActivateAltClickThrough())
         {
             return;
+        }
+
+        if (_stateManager.CurrentState is IslandShellState.Collapsed or IslandShellState.Active)
+        {
+            _eventDispatcher?.Publish(new IslandCollapsedHoveredEvent(DateTimeOffset.UtcNow));
         }
 
         if (_expandOnHover && _stateManager.CurrentState is IslandShellState.Collapsed or IslandShellState.Active)
@@ -635,6 +706,38 @@ public partial class IslandWindow : Window
         _notificationPeekTimer.Stop();
         _stateManager.ClearNotificationPeek();
         e.Handled = true;
+    }
+
+    private async void OnNotificationPrimaryActionClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await ExecuteNotificationPeekActionAsync(_primaryPeekAction).ConfigureAwait(true);
+    }
+
+    private async void OnNotificationSecondaryActionClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await ExecuteNotificationPeekActionAsync(_secondaryPeekAction).ConfigureAwait(true);
+    }
+
+    private async Task ExecuteNotificationPeekActionAsync(NotificationPeekAction? action)
+    {
+        if (action is null)
+        {
+            return;
+        }
+
+        NotificationPrimaryActionButton.IsEnabled = false;
+        NotificationSecondaryActionButton.IsEnabled = false;
+        try
+        {
+            await action.ExecuteAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            NotificationPrimaryActionButton.IsEnabled = true;
+            NotificationSecondaryActionButton.IsEnabled = true;
+        }
     }
 
     private bool TryActivateAltClickThrough()
