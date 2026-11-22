@@ -55,6 +55,26 @@ Each widget can be enabled, disabled, reordered, or configured independently in 
 - **Volume Mixer** — Per-app Windows audio volume sliders and mute toggles synced in real time.
 - **Developer Activity** — Opt-in Claude Code and OpenCode integration showing `Working`, `Needs attention`, `Awaiting approval`, and `Finished` states with inline Allow/Deny actions.
 
+### Developer Activity Setup
+
+**What triggers it:** Developer Activity listens only to opt-in local events from AI coding agents (no background port scanning or Git/IDE polling):
+- **Claude Code:** Runs `Shima.AgentBridge.exe` from lifecycle hooks (`PreToolUse`, `PermissionRequest`, `Notification`, `Stop`, `SubagentStop`) over a local Named Pipe (`\\.\pipe\shima-agent-bridge`).
+- **OpenCode:** Connects to a local `opencode serve` loopback endpoint (`http://localhost:4096` / `http://127.0.0.1:*`) and/or the optional plugin bridge (`%USERPROFILE%\.config\opencode\plugins\shima-bridge.ts`). *(Standalone OpenCode TUI without `opencode serve` or the plugin is not monitored.)*
+
+Active turns light up the collapsed notch status bar (**Working** green, **Awaiting approval** / **Needs attention** coral, **Finished** full green for 10s) and show session rows with inline **Allow** / **Deny** buttons when expanded.
+
+**Configure in Settings:**
+1. Open Shima **Settings** (via the system tray icon) and ensure **Developer Activity** is enabled under **Widgets**.
+2. Open **Developer Integrations** in the sidebar:
+   - **Claude Code:** Check **Enable Claude Code local hook bridge (opt-in)**, click **Install Claude hooks** (backs up `%USERPROFILE%\.claude\settings.json` first), then click **Check health**.
+   - **OpenCode:** Check **Enable OpenCode local server tracking (opt-in)**, confirm your `http://localhost:*` / `http://127.0.0.1:*` URL (plus optional server password), click **Save developer settings**, optionally click **Install OpenCode plugin**, and click **Check health**.
+
+**Quick test:** Run a task in Claude Code or `opencode serve`, or pipe a test hook event into `Shima.AgentBridge.exe` from PowerShell (with Claude Code opt-in enabled):
+```powershell
+'{"session_id":"demo-1","cwd":"C:\\repos\\demo","hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"dotnet test"}}' | & "$env:ProgramFiles\Shima\Shima.AgentBridge.exe" --shima-managed
+```
+Click **Allow** or **Deny** inside the expanded Dynamic Island (or swap `"PermissionRequest"` for `"Stop"` to trigger a quick green **Finished** flash).
+
 ### Customization & Privacy
 - **Appearance System** — Six customizable color tokens (Background, Accent, Border, Highlight/Glow, Text, Icon) for both collapsed and expanded states, 6 built-in themes, custom presets, live preview, and WCAG contrast warnings.
 - **Advanced Color Picker** — 2D saturation/brightness field, 0–360° hue slider, synchronized HEX/RGB/HSB inputs, and recent color swatches.
