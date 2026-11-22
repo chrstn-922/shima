@@ -1,8 +1,30 @@
+<div align="center">
+
+<img src="assets/branding/shima-cradled-island.svg" alt="Shima — The Cradled Island" width="112" />
+
 # Shima
 
-Shima is a Windows Dynamic Island desktop companion. It sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
+**A Windows Dynamic Island desktop companion — zero idle CPU, 8 modular widgets.**
+
+[Download v1.0.0](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) ·
+[`Shima-Setup-1.0.0-win-x64.exe`](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe) ·
+[`Shima-Setup-1.0.0-win-arm64.exe`](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-arm64.exe)
+
+</div>
+
+Shima sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
 
 **Status: All Phases 1–10 complete (T001–T056 done).** The solution includes core contracts, SQLite WAL persistence (v1–v7 migrations including `agent_session_logs`), atomic config and `runtime-journal.json` recovery storage, the widget registry with lazy expanded view loading, island state and pinning with multi-widget compact pill coexistence, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, Zen audio/display adapters, `Shima.AgentBridge`, independent opt-in `ClaudeCodeAdapter` and `OpenCodeAdapter` coding-agent adapters, the WPF island shell with collapsed notch status indicator and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, all 8 modular widgets (`Clock`, `Now Playing`, `Focus Timer`, `Notes`, `Inbox`, `Clipboard`, `Volume Mixer`, `Developer Activity`), offline-first `UpdateServiceAdapter` (HTTPS + SHA-256 + ECDSA manifest verification) and DPAPI-cached `LicenseServiceAdapter`, plus Sparse MSIX identity (`build/sparse-msix/AppxManifest.xml`) and dual-RID (`win-x64`, `win-arm64`) build/sign/verification scripts in `build/`. The Release build passes with 0 warnings and 0 errors across 171 unit, persistence, interop, widget, packaging, and FlaUI UI tests, and clean-profile live verification measured `320 ms` startup-to-input-idle, `0%` steady-state idle CPU, `0` TCP sockets, `79.22 MB` max private memory (`-0.1 MB` growth), `159.62 MB` max shared+private WPF/WinRT working set, and `-3` handle delta over a 15-second probe (`0` `System.Drawing` references, `0` hardcoded XAML hex literals).
+
+## Screenshots
+
+| Collapsed Dynamic Island | Now Playing Compact Pill |
+| :---: | :---: |
+| ![Collapsed Dynamic Island](docs/media/compact-pill.png) | ![Now Playing Compact Pill](docs/media/now-playing-compact-pill.png) |
+
+| Expanded Widget View | Settings Window |
+| :---: | :---: |
+| ![Expanded Widget View](docs/media/extended-island.png) | ![Settings Window](docs/media/settings.png) |
 
 ## Features
 
@@ -51,14 +73,19 @@ Five layers with inward-only dependencies. `Shima.Core` holds contracts and doma
 
 ## Installer (Recommended)
 
-For the simplest Windows setup with **Notification Inbox** unlocked automatically on first launch, download and run the matching Inno Setup installer (`Shima-Setup-<version>-win-x64.exe` or `Shima-Setup-<version>-win-arm64.exe`):
+For the simplest Windows setup with **Notification Inbox** unlocked automatically on first launch, download and run the matching Inno Setup installer from the [v1.0.0 release](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) (`Shima-Setup-1.0.0-win-x64.exe` or `Shima-Setup-1.0.0-win-arm64.exe`):
 
-1. Run `Shima-Setup-<version>-<rid>.exe` and follow the guided wizard (installs to `Program Files\Shima` with Start Menu and optional Desktop shortcuts).
+1. Run `Shima-Setup-1.0.0-win-x64.exe` (or `Shima-Setup-1.0.0-win-arm64.exe`) and follow the guided wizard (installs to `Program Files\Shima` with Start Menu and optional Desktop shortcuts).
 2. During setup on Windows 10 2004+ / Windows 11, the installer automatically prepares the embedded Sparse MSIX certificate (if self-signed) and registers `Shima.Identity-<rid>.msix` for your logged-in Windows user account.
 3. Keep **"Launch Shima"** checked on the finish screen — Shima starts immediately with Windows package identity active so the Notification Inbox works out of the box (older Windows builds fall back gracefully with all other widgets active).
 4. Uninstalling from Windows **Installed apps / Add or Remove Programs** cleanly stops Shima and unregisters the Sparse MSIX identity while preserving your local data in `%LOCALAPPDATA%\Shima\`.
 
-Portable `.zip` archives and standalone `Shima.Identity-<rid>.msix` packages remain available alongside the installer for manual or portable deployments.
+### Installation & SmartScreen Note
+
+- **Automatic Sparse MSIX Identity:** The installer handles trusting and registering the Sparse MSIX identity package (`Shima.Identity-<rid>.msix`) automatically so Windows Action Center integration for the **Notification Inbox** works immediately after install.
+- **Windows SmartScreen Prompt:** Because `v1.0.0` is signed with a self-signed certificate, Windows SmartScreen may display *"Windows protected your PC"* when launching the installer. Click **More info → Run anyway** to proceed.
+
+Portable `.zip` archives and standalone `Shima.Identity-<rid>.msix` packages remain available alongside the installer on the [Releases page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) for manual or portable deployments.
 
 ## Local Setup
 
