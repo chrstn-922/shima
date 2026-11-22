@@ -1,7 +1,7 @@
 # Color Contrast Validation & Auto-Repair Design (`FR-PICKER-006`)
 
 **Document Role**: Technical specification for Shima's non-blocking WCAG 2.1 contrast auditor and one-click `Restore Recommended Contrast` solver.  
-**Contract**: [appearance-manager-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/appearance-manager-contract.md)
+**Contract**: [appearance-manager-contract.md](../../specs/001-shima-dynamic-island/contracts/appearance-manager-contract.md)
 
 ---
 

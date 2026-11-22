@@ -1,7 +1,7 @@
 # Technical Research & Stack Decision: Shima
 
 **Feature**: `001-shima-dynamic-island` | **Date**: `2026-11-21` | **Research Cut-off**: `2026-11-21`  
-**Spec Reference**: [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md) | **Constitution**: [constitution.md](file:///C:/Users/chris/Projects/shima/.specify/memory/constitution.md)
+**Spec Reference**: [spec.md](spec.md) | **Constitution**: [constitution.md](../../.specify/memory/constitution.md)
 
 ---
 
@@ -140,7 +140,7 @@ All technical findings below are derived from official Microsoft Learn documenta
 
 ### 3.2 Weighted Decision Matrix
 
-Weights reflect [constitution.md](file:///C:/Users/chris/Projects/shima/.specify/memory/constitution.md) priorities (Performance & Resource Efficiency, Native Windows Integration, Security/Local-First, Architecture & Maintainability):
+Weights reflect [constitution.md](../../.specify/memory/constitution.md) priorities (Performance & Resource Efficiency, Native Windows Integration, Security/Local-First, Architecture & Maintainability):
 
 | Criterion | Weight | .NET 8 + WPF + WinRT + CsWin32 | .NET 8 + WinUI 3 | Tauri v2 (Rust + WebView2) | Electron (Node + Chromium) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -168,7 +168,7 @@ Weights reflect [constitution.md](file:///C:/Users/chris/Projects/shima/.specify
 
 Executed standalone Win32/WinRT spike executable (`Phase0Spike.exe`, `net8.0-windows10.0.22621.0`) and Windows SDK `MakeAppx.exe` (`10.0.19041.0`) on the development workstation:
 
-- **Host Environment**: Windows 11 `25H2` (`Build 26200.9711`, `x64`), `.NET SDK 8.0.428` (`C:\Users\chris\.dotnet`), `1` active monitor (`\\.\DISPLAY1`, `1536×864`, `96 DPI` / `100%`), HDR supported (`HdrSupported=True`) but inactive (`HdrEnabled=False`).
+- **Host Environment**: Windows 11 `25H2` (`Build 26200.9711`, `x64`), `.NET SDK 8.0.428` (`%USERPROFILE%\.dotnet`), `1` active monitor (`\\.\DISPLAY1`, `1536×864`, `96 DPI` / `100%`), HDR supported (`HdrSupported=True`) but inactive (`HdrEnabled=False`).
 
 | Spike | What Was Tested | Observed Result | Architectural Impact |
 | :--- | :--- | :--- | :--- |

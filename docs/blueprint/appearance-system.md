@@ -1,7 +1,7 @@
 # Appearance & Theme System Architecture (`Shima.Core` & `Shima.Presentation`)
 
 **Document Role**: Defines the persistent appearance configuration model, Collapsed/Expanded token linking, Per-Widget accent evaluation, Preset Management, and the `FR-PICKER-006` temporary live preview & pinning workflow.  
-**Contracts**: [appearance-manager-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/appearance-manager-contract.md) | [data-model.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/data-model.md)
+**Contracts**: [appearance-manager-contract.md](../../specs/001-shima-dynamic-island/contracts/appearance-manager-contract.md) | [data-model.md](../../specs/001-shima-dynamic-island/data-model.md)
 
 ---
 

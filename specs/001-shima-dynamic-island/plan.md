@@ -1,7 +1,7 @@
 # Implementation Plan & Software Architecture Blueprint: Shima
 
-**Branch**: `001-shima-dynamic-island` | **Date**: `2026-11-21` | **Spec**: [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md)  
-**Input**: Approved specification [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md) (including Clarifications Session `2026-11-21`), Phase 0 research [research.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/research.md), and [constitution.md](file:///C:/Users/chris/Projects/shima/.specify/memory/constitution.md) (`v1.0.0`).
+**Branch**: `001-shima-dynamic-island` | **Date**: `2026-11-21` | **Spec**: [spec.md](spec.md)  
+**Input**: Approved specification [spec.md](spec.md) (including Clarifications Session `2026-11-21`), Phase 0 research [research.md](research.md), and [constitution.md](../../.specify/memory/constitution.md) (`v1.0.0`).
 
 ---
 
@@ -36,7 +36,7 @@ Core engineering pillars:
 
 ## Constitution Check
 
-*GATE: Checked pre-Phase 0 and re-verified post-Phase 1 design against [constitution.md](file:///C:/Users/chris/Projects/shima/.specify/memory/constitution.md).*
+*GATE: Checked pre-Phase 0 and re-verified post-Phase 1 design against [constitution.md](../../.specify/memory/constitution.md).*
 
 | Constitution Principle | Compliance Status | Architectural Enforcement |
 | :--- | :---: | :--- |
@@ -46,7 +46,7 @@ Core engineering pillars:
 | **IV. Security & Privacy (Local-First)** | **PASS** | Local `%LOCALAPPDATA%\Shima\` storage with user-only NTFS ACLs + DPAPI secrets; clipboard privacy format exclusion (`ExcludeClipboardContentFromMonitorProcessing`); `0` core network I/O; user-SID ACL Named Pipe (`\\.\pipe\shima-agent-bridge`); opt-in fail-open agent integrations. |
 | **V. User Experience & Accessibility** | **PASS** | Centralized `ThemeResourceDictionary` tokens (zero hardcoded hex in views); High Contrast + Reduced Motion support; full keyboard navigation (`Tab`, `Esc`, arrow keys in 2D color canvas); non-blocking WCAG contrast advisory + `Restore Recommended Contrast`; per-widget independent config & fault boundary. |
 | **VI. Engineering Discipline & PM** | **PASS** | Measurable NFRs, ADRs (`docs/blueprint/architectural-decision-records.md`), full test matrix (`docs/blueprint/test-strategy.md`), and phased milestone roadmap (`docs/blueprint/development-roadmap.md`). |
-| **VII. Spec-First & Evidence-Based** | **PASS** | Grounded in approved [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md) + verified official Microsoft/Claude/OpenCode research in [research.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/research.md); no fabricated APIs; explicit `[NEEDS VALIDATION]` markers for Phase 0 prototypes. |
+| **VII. Spec-First & Evidence-Based** | **PASS** | Grounded in approved [spec.md](spec.md) + verified official Microsoft/Claude/OpenCode research in [research.md](research.md); no fabricated APIs; explicit `[NEEDS VALIDATION]` markers for Phase 0 prototypes. |
 
 ---
 
@@ -124,24 +124,24 @@ tests/
 
 To avoid duplicating prose across files, detailed design artifacts are cross-referenced directly:
 
-1. **System Architecture & 17 Mermaid Diagrams**: See [system-architecture.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/system-architecture.md) for the complete 5-layer component breakdown and all 17 behavioral/sequence/state Mermaid diagrams.
-2. **Widget Architecture & Contracts**: See [widget-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/widget-contract.md) for `IWidgetModule`, `IWidgetContext`, lifecycle transitions, fault containment, and zero-coupling extensibility.
-3. **Database & Persistence Model**: See [data-model.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/data-model.md) for the ER diagram, SQLite WAL tables, JSON appearance schemas, validation rules, retention limits, and update-safe schema migrations.
-4. **Windows OS Integration & Overlay Pinning**: See [windows-integration-design.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/windows-integration-design.md) and [windows-adapters-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/windows-adapters-contract.md) for non-activating windowing, priority-based `OverlayPinController`, fullscreen detection, Per-Monitor DPI v2, `UserNotificationListener` Sparse Package rules, GSMTC, CoreAudio WASAPI, `WM_CLIPBOARDUPDATE`, and crash-safe `MagSetFullscreenColorEffect` Zen Mode.
-5. **Security & Privacy Architecture**: See [security-privacy-architecture.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/security-privacy-architecture.md) for local ACL/DPAPI storage, clipboard exclusion flags, pipe SID security, network matrix (`0` core bytes), and threat model.
-6. **Performance Engineering**: See [performance-strategy.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/performance-strategy.md) for resource budgets, idle/battery tick suspension, `WriteableBitmap` pixel buffer rendering, and throttled live preview pipelines.
-7. **UI/UX Design System**: See [ui-ux-design-system.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/ui-ux-design-system.md) for Shima's original design language, concave notch geometry, typography, Settings sidebar layout, and WCAG/Reduced-Motion accessibility.
+1. **System Architecture & 17 Mermaid Diagrams**: See [system-architecture.md](../../docs/blueprint/system-architecture.md) for the complete 5-layer component breakdown and all 17 behavioral/sequence/state Mermaid diagrams.
+2. **Widget Architecture & Contracts**: See [widget-contract.md](contracts/widget-contract.md) for `IWidgetModule`, `IWidgetContext`, lifecycle transitions, fault containment, and zero-coupling extensibility.
+3. **Database & Persistence Model**: See [data-model.md](data-model.md) for the ER diagram, SQLite WAL tables, JSON appearance schemas, validation rules, retention limits, and update-safe schema migrations.
+4. **Windows OS Integration & Overlay Pinning**: See [windows-integration-design.md](../../docs/blueprint/windows-integration-design.md) and [windows-adapters-contract.md](contracts/windows-adapters-contract.md) for non-activating windowing, priority-based `OverlayPinController`, fullscreen detection, Per-Monitor DPI v2, `UserNotificationListener` Sparse Package rules, GSMTC, CoreAudio WASAPI, `WM_CLIPBOARDUPDATE`, and crash-safe `MagSetFullscreenColorEffect` Zen Mode.
+5. **Security & Privacy Architecture**: See [security-privacy-architecture.md](../../docs/blueprint/security-privacy-architecture.md) for local ACL/DPAPI storage, clipboard exclusion flags, pipe SID security, network matrix (`0` core bytes), and threat model.
+6. **Performance Engineering**: See [performance-strategy.md](../../docs/blueprint/performance-strategy.md) for resource budgets, idle/battery tick suspension, `WriteableBitmap` pixel buffer rendering, and throttled live preview pipelines.
+7. **UI/UX Design System**: See [ui-ux-design-system.md](../../docs/blueprint/ui-ux-design-system.md) for Shima's original design language, concave notch geometry, typography, Settings sidebar layout, and WCAG/Reduced-Motion accessibility.
 8. **Advanced Color Picker, Appearance System & Contrast Validation (`FR-PICKER-006`)**:
-   - [color-picker-architecture.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/color-picker-architecture.md) & [color-picker-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/color-picker-contract.md)
-   - [appearance-system.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/appearance-system.md) & [appearance-manager-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/appearance-manager-contract.md)
-   - [color-contrast-validation.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/color-contrast-validation.md)
-9. **Coding Agent Integrations (`Claude Code` & `OpenCode`)**: See [coding-agent-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/coding-agent-contract.md) for independent opt-in adapter contracts and fail-open terminal passthrough guarantees.
+   - [color-picker-architecture.md](../../docs/blueprint/color-picker-architecture.md) & [color-picker-contract.md](contracts/color-picker-contract.md)
+   - [appearance-system.md](../../docs/blueprint/appearance-system.md) & [appearance-manager-contract.md](contracts/appearance-manager-contract.md)
+   - [color-contrast-validation.md](../../docs/blueprint/color-contrast-validation.md)
+9. **Coding Agent Integrations (`Claude Code` & `OpenCode`)**: See [coding-agent-contract.md](contracts/coding-agent-contract.md) for independent opt-in adapter contracts and fail-open terminal passthrough guarantees.
 10. **QA, Packaging, Risks & Roadmap**:
-    - [test-strategy.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/test-strategy.md)
-    - [deployment-strategy.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/deployment-strategy.md)
-    - [risk-register.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/risk-register.md)
-    - [development-roadmap.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/development-roadmap.md)
-    - [architectural-decision-records.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/architectural-decision-records.md)
+    - [test-strategy.md](../../docs/blueprint/test-strategy.md)
+    - [deployment-strategy.md](../../docs/blueprint/deployment-strategy.md)
+    - [risk-register.md](../../docs/blueprint/risk-register.md)
+    - [development-roadmap.md](../../docs/blueprint/development-roadmap.md)
+    - [architectural-decision-records.md](../../docs/blueprint/architectural-decision-records.md)
 
 ---
 

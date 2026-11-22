@@ -1,7 +1,7 @@
 # Color Picker Architecture (`Shima.Presentation` & `Shima.Core`)
 
 **Document Role**: Technical design for Shima's Photoshop 22.3.0-inspired Advanced Color Picker system (functional interaction reference only; original visual identity).  
-**Contracts**: [color-picker-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/color-picker-contract.md) | **Contrast**: [color-contrast-validation.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/color-contrast-validation.md)
+**Contracts**: [color-picker-contract.md](../../specs/001-shima-dynamic-island/contracts/color-picker-contract.md) | **Contrast**: [color-contrast-validation.md](color-contrast-validation.md)
 
 ---
 

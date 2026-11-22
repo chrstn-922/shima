@@ -1,7 +1,7 @@
 # Project Management & Phased Development Roadmap: Shima
 
 **Document Role**: Epics, milestones, dependencies, testing gates, complexity ratings, and confidence-bounded effort estimates (no false precision).  
-**Task Granularity**: Actionable dependency-ordered items are tracked in [tasks.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/tasks.md).
+**Task Granularity**: Actionable dependency-ordered items are tracked in [tasks.md](../../specs/001-shima-dynamic-island/tasks.md).
 
 ---
 

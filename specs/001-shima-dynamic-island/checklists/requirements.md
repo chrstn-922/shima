@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-11-21
-**Feature**: [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md)
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 

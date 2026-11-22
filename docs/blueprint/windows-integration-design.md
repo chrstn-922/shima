@@ -1,7 +1,7 @@
 # Windows Operating System Integration & Visibility Design
 
 **Document Role**: Detailed engineering design for every Windows OS boundary in `Shima.WindowsInterop`, including the Overlay Pinning & Visibility Management arbiter.  
-**Contracts**: [windows-adapters-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/windows-adapters-contract.md) | **Research**: [research.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/research.md)
+**Contracts**: [windows-adapters-contract.md](../../specs/001-shima-dynamic-island/contracts/windows-adapters-contract.md) | **Research**: [research.md](../../specs/001-shima-dynamic-island/research.md)
 
 ---
 

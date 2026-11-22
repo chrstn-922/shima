@@ -83,3 +83,7 @@ dotnet run --project src/Shima.App -c Release
 ```powershell
 .\build\build-release.ps1 -Sign -CreateDevSelfSignedCert
 ```
+
+## License
+
+Shima is licensed under the [MIT License](LICENSE).

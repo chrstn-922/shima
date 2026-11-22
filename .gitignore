@@ -3,6 +3,9 @@
 .specify/**/*-config.local.yml
 .specify/workflows/runs/
 
+# Visual Studio cache
+.vs/
+
 # .NET / C# build outputs
 bin/
 obj/
@@ -17,5 +20,16 @@ artifacts/
 *.snupkg
 *.msix
 *.appx
+
+# Certificates, private keys, environment secrets, and local databases
 *.cer
 *.pfx
+*.p12
+*.key
+.env
+.env.*
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3

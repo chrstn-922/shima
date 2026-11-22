@@ -35,7 +35,7 @@ dotnet --info
 
 ## 3. Planned Build & Automated Test Commands *(Execution Phase)*
 
-Once source assemblies under `src/` and `tests/` are scaffolded per [plan.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/plan.md) and [tasks.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/tasks.md):
+Once source assemblies under `src/` and `tests/` are scaffolded per [plan.md](plan.md) and [tasks.md](tasks.md):
 
 ```powershell
 # Restore & build all layers (Zero warnings as errors)
@@ -57,7 +57,7 @@ dotnet test tests/Shima.UI.Tests/Shima.UI.Tests.csproj
 
 ## 4. End-to-End Validation Scenarios (Acceptance Walkthrough)
 
-Refer to [test-strategy.md](file:///C:/Users/chris/Projects/shima/docs/blueprint/test-strategy.md) for detailed assertions. Key validation gates:
+Refer to [test-strategy.md](../../docs/blueprint/test-strategy.md) for detailed assertions. Key validation gates:
 
 1. **Shell & Multi-Monitor DPI**:
    - Launch Shima; verify top-center flush anchor (`Y = 0`), concave top fillets, and `0.0%` idle CPU after 5 seconds.

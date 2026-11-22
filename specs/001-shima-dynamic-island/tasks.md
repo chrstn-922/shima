@@ -1,14 +1,14 @@
 # Tasks: Shima — Windows Dynamic Island Desktop Companion
 
 **Input**: Design documents from `specs/001-shima-dynamic-island/` and `docs/blueprint/`  
-**Prerequisites**: [plan.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/plan.md) (required), [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md) (required), [research.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/research.md), [data-model.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/data-model.md), [contracts/](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/widget-contract.md)
+**Prerequisites**: [plan.md](plan.md) (required), [spec.md](spec.md) (required), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/widget-contract.md)
 
 **Tests**: Unit, contract, persistence, OS-adapter, and FlaUI UI tests are included across every story phase per `spec.md` Section 11.J, `test-strategy.md`, and Constitution Principle VI.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Maps to User Stories in [spec.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/spec.md) (`US1`–`US7`)
+- **[Story]**: Maps to User Stories in [spec.md](spec.md) (`US1`–`US7`)
 
 ---
 

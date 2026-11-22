@@ -1,7 +1,7 @@
 # Shima System Architecture & Behavioral Diagrams
 
 **Document Role**: Master architectural breakdown across Shima's 5 decoupled layers (Presentation, Application Core, Windows Integration, Widget Modules, Infrastructure) and all 17 system, sequence, and data-flow diagrams.  
-**Related**: [plan.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/plan.md) | [widget-contract.md](file:///C:/Users/chris/Projects/shima/specs/001-shima-dynamic-island/contracts/widget-contract.md)
+**Related**: [plan.md](../../specs/001-shima-dynamic-island/plan.md) | [widget-contract.md](../../specs/001-shima-dynamic-island/contracts/widget-contract.md)
 
 ---
 
