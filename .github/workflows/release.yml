@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run Release tests
+        shell: pwsh
+        run: dotnet test Shima.sln -c Release
+
+      - name: Build, package, and sign release artifacts
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $version = $tag.TrimStart('v')
+          $downloadBaseUrl = "https://github.com/$($env:GITHUB_REPOSITORY)/releases/download/$tag"
+          .\build\build-release.ps1 `
+            -Version $version `
+            -DownloadBaseUrl $downloadBaseUrl `
+            -Sign `
+            -CreateDevSelfSignedCert `
+            -AutoInstallInnoSetup
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Shima ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/releases/**/*.exe
+            artifacts/releases/**/*.zip
+            artifacts/releases/**/*.msix
+            artifacts/releases/manifest-stable.json

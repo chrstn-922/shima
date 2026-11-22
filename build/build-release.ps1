@@ -30,6 +30,10 @@ param(
 
     [switch]$CreateDevSelfSignedCert,
 
+    [switch]$SkipInstaller,
+
+    [switch]$AutoInstallInnoSetup,
+
     [switch]$RequireVelopack
 )
 
@@ -97,6 +101,29 @@ function Resolve-IsccPath {
     return $null
 }
 
+function Install-InnoSetupWithWinget {
+    $wingetCmd = Get-Command 'winget.exe' -ErrorAction SilentlyContinue
+    if ($null -eq $wingetCmd) {
+        Write-Warning "winget.exe was not found; cannot install Inno Setup 6 automatically."
+        return $null
+    }
+
+    Write-Host "Installing Inno Setup 6 silently via winget..."
+    & $wingetCmd.Source install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
+    $installExitCode = $LASTEXITCODE
+
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = (@($env:Path, $machinePath, $userPath) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ';'
+
+    $resolved = Resolve-IsccPath
+    if ($null -eq $resolved -and $installExitCode -ne 0) {
+        Write-Warning "winget exited with code $installExitCode while installing Inno Setup 6, and ISCC.exe was still not found."
+    }
+
+    return $resolved
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $appProject = Join-Path $repoRoot 'src\Shima.App\Shima.App.csproj'
 $bridgeProject = Join-Path $repoRoot 'src\Shima.AgentBridge\Shima.AgentBridge.csproj'
@@ -112,13 +139,37 @@ $makePri = Resolve-MakePriPath
 if ($null -eq $makePri) {
     Write-Warning "MakePri.exe was not found in Windows 10/11 SDK or PATH; Sparse MSIX packages will be built without a generated resources.pri index."
 }
-$isccPath = Resolve-IsccPath
-if ($null -eq $isccPath) {
-    Write-Warning "Inno Setup compiler ('ISCC.exe') was not found in PATH or standard install locations. Portable .zip and Sparse MSIX artifacts will still be built; install Inno Setup 6 to build Shima-Setup installers."
-}
-elseif (-not (Test-Path $innoScriptPath)) {
-    Write-Warning "Inno Setup script '$innoScriptPath' was not found; skipping Shima-Setup installer compilation."
-    $isccPath = $null
+$isccPath = $null
+if (-not $SkipInstaller) {
+    if (-not (Test-Path $innoScriptPath)) {
+        Write-Warning "Inno Setup script '$innoScriptPath' was not found; skipping Shima-Setup installer compilation."
+    }
+    else {
+        $isccPath = Resolve-IsccPath
+        if ($null -eq $isccPath) {
+            $shouldAutoInstall = $AutoInstallInnoSetup.IsPresent
+            $isNonInteractiveHost = ($env:CI -eq 'true') -or ($env:GITHUB_ACTIONS -eq 'true') -or (@([Environment]::GetCommandLineArgs() -match '^-NonI').Count -gt 0)
+            if (-not $shouldAutoInstall -and -not $isNonInteractiveHost -and [Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+                if ($null -ne (Get-Command 'winget.exe' -ErrorAction SilentlyContinue)) {
+                    try {
+                        $reply = Read-Host "Inno Setup 6 (ISCC.exe) was not found. Install it silently via winget now? [y/N]"
+                        $shouldAutoInstall = $reply -match '^(y|yes)$'
+                    }
+                    catch {
+                        $shouldAutoInstall = $false
+                    }
+                }
+            }
+
+            if ($shouldAutoInstall) {
+                $isccPath = Install-InnoSetupWithWinget
+            }
+
+            if ($null -eq $isccPath) {
+                Write-Warning "Inno Setup compiler ('ISCC.exe') was not found in PATH or standard install locations. Portable .zip and Sparse MSIX artifacts will still be built; install Inno Setup 6 or pass -AutoInstallInnoSetup to build Shima-Setup installers."
+            }
+        }
+    }
 }
 $vpkCmd = Get-Command 'vpk' -ErrorAction SilentlyContinue
 if ($RequireVelopack -and $null -eq $vpkCmd) {

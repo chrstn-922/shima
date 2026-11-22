@@ -147,10 +147,23 @@ public sealed class ReleaseAndPackagingTests
         buildScript.Should().Contain("installerSha256");
         buildScript.Should().Contain("$CreateDevSelfSignedCert");
         buildScript.Should().Contain("AllowUntrustedSelfSigned");
+        buildScript.Should().Contain("$SkipInstaller");
+        buildScript.Should().Contain("$AutoInstallInnoSetup");
+        buildScript.Should().Contain("JRSoftware.InnoSetup");
         buildScript.Should().Contain("makepri.exe");
         buildScript.Should().Contain("resources.pri");
         buildScript.Should().Contain("$publishAssetsDir");
         buildScript.Should().Contain("Assets\\*.png");
+
+        var workflowPath = Path.Combine(repoRoot, ".github", "workflows", "release.yml");
+        File.Exists(workflowPath).Should().BeTrue("GitHub release workflow must exist");
+        var workflowYaml = File.ReadAllText(workflowPath);
+        workflowYaml.Should().Contain("windows-latest");
+        workflowYaml.Should().Contain("dotnet test Shima.sln -c Release");
+        workflowYaml.Should().Contain("build-release.ps1");
+        workflowYaml.Should().Contain("-Sign");
+        workflowYaml.Should().Contain("-CreateDevSelfSignedCert");
+        workflowYaml.Should().Contain("softprops/action-gh-release");
 
         var iconGenScript = File.ReadAllText(Path.Combine(buildDir, "generate-brand-icons.ps1"));
         iconGenScript.Should().Contain("altform-unplated_targetsize-");

@@ -6,9 +6,9 @@
 
 **A Windows Dynamic Island desktop companion — ~0% idle CPU, 8 modular widgets.**
 
-[Download v1.0.0](https://github.com/chrstn-922/shima/releases/tag/v1.0.0) ·
-[`Shima-Setup-1.0.0-win-x64.exe`](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe) ·
-[`Shima-Setup-1.0.0-win-arm64.exe`](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-arm64.exe)
+[**Download Installer for Windows (64-bit)**](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe) ·
+[ARM64](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-arm64.exe) ·
+[All v1.0.0 Releases](https://github.com/chrstn-922/shima/releases/tag/v1.0.0)
 
 </div>
 
@@ -26,12 +26,18 @@ Shima sits flush at the top-center edge of your Windows screen, stays collapsed 
 
 ## Installation
 
-1. Download **`Shima-Setup-1.0.0-win-x64.exe`** (or **`Shima-Setup-1.0.0-win-arm64.exe`** for ARM64 devices) from the [v1.0.0 release page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0).
+1. Download [**`Shima-Setup-1.0.0-win-x64.exe`**](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe) (or [**`Shima-Setup-1.0.0-win-arm64.exe`**](https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-arm64.exe) for ARM64 devices) from the [v1.0.0 release page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0).
 2. Run the installer. Because v1.0.0 uses a self-signed certificate, Windows SmartScreen may show *"Windows protected your PC"* — click **More info → Run anyway** to continue.
 3. During setup on Windows 10 (build 19041+) or Windows 11, the installer automatically registers the Sparse MSIX identity (`Shima.Identity-<rid>.msix`) so the **Notification Inbox** connects to Windows Action Center right away.
 4. Keep **Launch Shima** checked on the final screen.
 
 > Portable `.zip` builds and standalone `.msix` identity packages are also available on the [Releases page](https://github.com/chrstn-922/shima/releases/tag/v1.0.0). Uninstalling from Windows **Installed apps** cleanly removes the app and unregisters the Sparse MSIX identity while keeping your data in `%LOCALAPPDATA%\Shima\`.
+
+### One-Line Terminal Install (Optional)
+
+```powershell
+irm https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe -OutFile "$env:TEMP\Shima-Setup.exe"; Start-Process "$env:TEMP\Shima-Setup.exe"
+```
 
 ## Features
 
@@ -70,7 +76,7 @@ The solution is split into five inward-only dependency layers (`Shima.Core`, `Sh
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) with the Windows Desktop workload
 - Windows 10/11 SDK `10.0.22621.0` or newer (`MakeAppx.exe`, `SignTool.exe`, `MakePri.exe`)
 - PowerShell 5.1+ or PowerShell 7+
-- *(Optional)* [Inno Setup 6](https://jrsoftware.org/isinfo.php) to compile `Shima-Setup-*.exe`
+- *(Optional)* [Inno Setup 6](https://jrsoftware.org/isinfo.php) to compile `Shima-Setup-*.exe` (`build-release.ps1` can install it automatically via `winget` when `-AutoInstallInnoSetup` is passed or when prompted interactively; GitHub Releases are also built and published automatically on `v*` tag push via [the release workflow](.github/workflows/release.yml))
 
 ### Build, Test & Run
 ```powershell
