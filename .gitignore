@@ -33,3 +33,9 @@ artifacts/
 *.db-shm
 *.sqlite
 *.sqlite3
+
+.agents/
+.opencode/
+.specify/
+AGENTS.md
+.ignore
