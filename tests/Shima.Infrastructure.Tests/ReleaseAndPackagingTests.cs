@@ -131,6 +131,8 @@ public sealed class ReleaseAndPackagingTests
         buildScript.Should().Contain("ISCC.exe");
         buildScript.Should().Contain("shima.iss");
         buildScript.Should().Contain("installerSha256");
+        buildScript.Should().Contain("$CreateDevSelfSignedCert");
+        buildScript.Should().Contain("AllowUntrustedSelfSigned");
 
         var srcRoot = Path.Combine(repoRoot, "src");
         foreach (var file in Directory.EnumerateFiles(srcRoot, "*.*", SearchOption.AllDirectories))

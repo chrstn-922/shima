@@ -98,7 +98,8 @@ public sealed class DeveloperWidgetModule :
 
     public object? CreateCompactActiveView() => new Views.DeveloperCompactView(ViewModel);
 
-    public object? CreateCollapsedStatusView() => new Views.DeveloperCollapsedBarView(ViewModel);
+    public object? CreateCollapsedStatusView() =>
+        ViewModel.IsCollapsedBarVisible ? new Views.DeveloperCollapsedBarView(ViewModel) : null;
 
     public object CreateSettingsView() => new Views.DeveloperSettingsView(ViewModel);
 

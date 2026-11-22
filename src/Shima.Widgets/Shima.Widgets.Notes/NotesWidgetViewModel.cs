@@ -28,6 +28,7 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
 {
     public static readonly TimeSpan AutoSaveDebounceDelay = TimeSpan.FromMilliseconds(500);
     public static readonly TimeSpan CopyFeedbackDuration = TimeSpan.FromMilliseconds(1500);
+    public static readonly TimeSpan SaveFeedbackDuration = TimeSpan.FromMilliseconds(1500);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly INoteRepository _repository;
@@ -37,6 +38,8 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
     private readonly Func<string, CancellationToken, Task<bool>>? _copyTextOverride;
     private readonly IOneShotTimer _copyFeedbackTimer;
     private readonly bool _ownsCopyFeedbackTimer;
+    private readonly IOneShotTimer _saveFeedbackTimer;
+    private readonly bool _ownsSaveFeedbackTimer;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private readonly object _sync = new();
 
@@ -53,8 +56,13 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
     private string _searchQuery = string.Empty;
     private string _saveStatusLabel = "Saved";
     private string _wordCountLabel = "0 words";
+    private string _noteCountLabel = "0 notes";
+    private string _selectedPositionLabel = "0/0";
     private bool _hasNotes;
+    private bool _canNavigateNotes;
     private bool _isDirty;
+    private bool _hasUnsavedChanges;
+    private bool _isSavedFeedbackActive;
     private bool _isCopiedFeedbackActive;
     private bool _isCopyError;
     private bool _suppressEditorDirtyTracking;
@@ -67,7 +75,8 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
         IClipboardMonitorAdapter? clipboardAdapter = null,
         Func<DateTimeOffset>? utcNowProvider = null,
         Func<string, CancellationToken, Task<bool>>? copyTextOverride = null,
-        IOneShotTimer? copyFeedbackTimer = null)
+        IOneShotTimer? copyFeedbackTimer = null,
+        IOneShotTimer? saveFeedbackTimer = null)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _debounceTimer = debounceTimer ?? throw new ArgumentNullException(nameof(debounceTimer));
@@ -76,6 +85,8 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
         _copyTextOverride = copyTextOverride;
         _ownsCopyFeedbackTimer = copyFeedbackTimer is null;
         _copyFeedbackTimer = copyFeedbackTimer ?? new OneShotTimer();
+        _ownsSaveFeedbackTimer = saveFeedbackTimer is null;
+        _saveFeedbackTimer = saveFeedbackTimer ?? new OneShotTimer();
     }
 
     public ObservableCollection<NoteSummaryViewModel> Notes { get; } = [];
@@ -89,6 +100,8 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             {
                 OnPropertyChanged(nameof(HasActiveNote));
                 OnPropertyChanged(nameof(PinActiveActionLabel));
+                OnPropertyChanged(nameof(PinButtonLabel));
+                OnPropertyChanged(nameof(SaveActiveActionLabel));
             }
         }
     }
@@ -109,11 +122,69 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             if (SetField(ref _activeIsPinned, value))
             {
                 OnPropertyChanged(nameof(PinActiveActionLabel));
+                OnPropertyChanged(nameof(PinButtonLabel));
             }
         }
     }
 
     public string PinActiveActionLabel => ActiveIsPinned ? "Unpin note" : "Pin note";
+
+    public string PinButtonLabel => ActiveIsPinned ? "Unpin" : "Pin";
+
+    public bool HasUnsavedChanges
+    {
+        get => _hasUnsavedChanges;
+        private set
+        {
+            if (SetField(ref _hasUnsavedChanges, value))
+            {
+                OnPropertyChanged(nameof(SaveButtonLabel));
+                OnPropertyChanged(nameof(SaveActiveActionLabel));
+            }
+        }
+    }
+
+    public bool IsSavedFeedbackActive
+    {
+        get => _isSavedFeedbackActive;
+        private set
+        {
+            if (SetField(ref _isSavedFeedbackActive, value))
+            {
+                OnPropertyChanged(nameof(SaveButtonLabel));
+                OnPropertyChanged(nameof(SaveActiveActionLabel));
+            }
+        }
+    }
+
+    public string SaveButtonLabel => _isSavedFeedbackActive ? "Saved" : "Save";
+
+    public string SaveActiveActionLabel =>
+        _isSavedFeedbackActive
+            ? "Note saved"
+            : _hasUnsavedChanges
+                ? "Save unsaved note changes"
+                : "Save note";
+
+    internal bool IsSaveFeedbackTimerPending => _saveFeedbackTimer.IsPending;
+
+    public string NoteCountLabel
+    {
+        get => _noteCountLabel;
+        private set => SetField(ref _noteCountLabel, value);
+    }
+
+    public string SelectedPositionLabel
+    {
+        get => _selectedPositionLabel;
+        private set => SetField(ref _selectedPositionLabel, value);
+    }
+
+    public bool CanNavigateNotes
+    {
+        get => _canNavigateNotes;
+        private set => SetField(ref _canNavigateNotes, value);
+    }
 
     public bool HasNotes
     {
@@ -165,11 +236,15 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             }
 
             ActiveTitle = NoteEntry.DeriveTitle(null, normalized);
+            OnPropertyChanged(nameof(ActiveNoteId));
             OnPropertyChanged(nameof(HasActiveNote));
             _copyFeedbackTimer.Cancel();
+            _saveFeedbackTimer.Cancel();
             IsCopiedFeedbackActive = false;
             IsCopyError = false;
-            SaveStatusLabel = wasTruncated ? "200 KB limit reached" : "Saving...";
+            IsSavedFeedbackActive = false;
+            HasUnsavedChanges = true;
+            SaveStatusLabel = wasTruncated ? "200 KB limit reached" : "Unsaved changes";
             _debounceTimer.Schedule(AutoSaveDebounceDelay, OnDebounceTimerElapsed);
         }
     }
@@ -288,11 +363,15 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             },
             ct).ConfigureAwait(false);
 
-        SearchQuery = string.Empty;
-        await RefreshFromRepositoryAsync(selectFirstIfMissing: false, ct).ConfigureAwait(false);
+        lock (_sync)
+        {
+            _searchQuery = string.Empty;
+        }
+
+        DispatchToUi(() => OnPropertyChanged(nameof(SearchQuery)));
         LoadNoteIntoEditor(created);
-        SyncNoteSummaries();
-        SaveStatusLabel = "Saved";
+        await RefreshFromRepositoryAsync(selectFirstIfMissing: false, ct).ConfigureAwait(false);
+        DispatchToUi(() => SaveStatusLabel = "Saved");
     }
 
     public async Task SelectNoteAsync(string noteId, CancellationToken ct = default)
@@ -325,6 +404,118 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             LoadNoteIntoEditor(target);
             SyncNoteSummaries();
         }
+    }
+
+    public Task SelectPreviousNoteAsync(CancellationToken ct = default) =>
+        StepSelectedNoteAsync(-1, ct);
+
+    public Task SelectNextNoteAsync(CancellationToken ct = default) =>
+        StepSelectedNoteAsync(1, ct);
+
+    public async Task StepSelectedNoteAsync(int delta, CancellationToken ct = default)
+    {
+        await FlushPendingSaveAsync(ct).ConfigureAwait(false);
+
+        NoteEntry? target = null;
+        lock (_sync)
+        {
+            if (_allNotes.Count == 0)
+            {
+                return;
+            }
+
+            var currentIndex = string.IsNullOrWhiteSpace(_activeNoteId)
+                ? -1
+                : _allNotes.FindIndex(n => string.Equals(n.NoteId, _activeNoteId, StringComparison.Ordinal));
+            var nextIndex = currentIndex < 0
+                ? 0
+                : ((currentIndex + delta) % _allNotes.Count + _allNotes.Count) % _allNotes.Count;
+            target = _allNotes[nextIndex];
+        }
+
+        LoadNoteIntoEditor(target);
+        SyncNoteSummaries();
+    }
+
+    public async Task<bool> SaveActiveNoteAsync(CancellationToken ct = default)
+    {
+        _debounceTimer.Cancel();
+
+        await _saveGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            string? noteId;
+            string content;
+            bool isPinned;
+            DateTimeOffset createdAt;
+
+            lock (_sync)
+            {
+                if (string.IsNullOrWhiteSpace(_activeNoteId))
+                {
+                    return false;
+                }
+
+                noteId = _activeNoteId;
+                content = _editorContent;
+                isPinned = _activeIsPinned;
+                createdAt = _activeCreatedAtUtc == default ? _utcNowProvider().ToUniversalTime() : _activeCreatedAtUtc;
+                _isDirty = false;
+            }
+
+            var now = _utcNowProvider().ToUniversalTime();
+            var saved = await _repository.UpsertAsync(
+                new NoteEntry
+                {
+                    NoteId = noteId,
+                    Title = NoteEntry.DeriveTitle(null, content),
+                    ContentText = content,
+                    IsPinned = isPinned,
+                    CreatedAtUtc = createdAt,
+                    UpdatedAtUtc = now
+                },
+                ct).ConfigureAwait(false);
+
+            await RefreshFromRepositoryAsync(selectFirstIfMissing: false, ct).ConfigureAwait(false);
+            if (!_disposed)
+            {
+                _saveFeedbackTimer.Schedule(SaveFeedbackDuration, ClearSaveFeedback);
+            }
+
+            DispatchToUi(() =>
+            {
+                ActiveTitle = saved.Title;
+                HasUnsavedChanges = false;
+                IsCopiedFeedbackActive = false;
+                IsCopyError = false;
+                IsSavedFeedbackActive = true;
+                SaveStatusLabel = "Saved";
+                OnPropertyChanged(nameof(AccessibleStatus));
+            });
+
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _context?.Logger.Error("Failed to save note to SQLite repository.", ex);
+            DispatchToUi(() => SaveStatusLabel = "Save error");
+            return false;
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+    }
+
+    public void ClearSaveFeedback()
+    {
+        _saveFeedbackTimer.Cancel();
+        if (_disposed)
+        {
+            return;
+        }
+
+        DispatchToUi(() => IsSavedFeedbackActive = false);
     }
 
     public async Task DeleteNoteAsync(string noteId, CancellationToken ct = default)
@@ -448,7 +639,7 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             IsCopyError = false;
             if (SaveStatusLabel is "Copied" or "Copy failed" or "Nothing to copy")
             {
-                SaveStatusLabel = isDirty ? "Saving..." : "Saved";
+                SaveStatusLabel = isDirty ? "Unsaved changes" : "Saved";
             }
         });
     }
@@ -512,6 +703,7 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             DispatchToUi(() =>
             {
                 ActiveTitle = saved.Title;
+                HasUnsavedChanges = false;
                 IsCopiedFeedbackActive = false;
                 IsCopyError = false;
                 SaveStatusLabel = "Saved";
@@ -579,6 +771,12 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             _copyFeedbackTimer.Dispose();
         }
 
+        _saveFeedbackTimer.Cancel();
+        if (_ownsSaveFeedbackTimer)
+        {
+            _saveFeedbackTimer.Dispose();
+        }
+
         NotifyInputFocusChanged(false);
         _debounceTimer.Dispose();
         _saveGate.Dispose();
@@ -617,12 +815,18 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task RefreshFromRepositoryAsync(bool selectFirstIfMissing, CancellationToken ct)
     {
-        var query = SearchQuery;
+        string query;
+        lock (_sync)
+        {
+            query = _searchQuery;
+        }
+
         var items = string.IsNullOrWhiteSpace(query)
             ? await _repository.GetAllAsync(ct).ConfigureAwait(false)
             : await _repository.SearchAsync(query, ct).ConfigureAwait(false);
 
         NoteEntry? selected = null;
+        bool shouldLoadSelected = false;
         lock (_sync)
         {
             _allNotes = items.ToList();
@@ -634,10 +838,11 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             if (selected is null && selectFirstIfMissing && _allNotes.Count > 0)
             {
                 selected = _allNotes[0];
+                shouldLoadSelected = true;
             }
         }
 
-        if (selected is not null && selectFirstIfMissing && string.IsNullOrWhiteSpace(ActiveNoteId))
+        if (selected is not null && shouldLoadSelected)
         {
             LoadNoteIntoEditor(selected);
         }
@@ -647,21 +852,25 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
 
     private void LoadNoteIntoEditor(NoteEntry note)
     {
+        lock (_sync)
+        {
+            _activeNoteId = note.NoteId;
+            _activeCreatedAtUtc = note.CreatedAtUtc;
+            _isDirty = false;
+        }
+
+        _copyFeedbackTimer.Cancel();
+        _saveFeedbackTimer.Cancel();
+
         DispatchToUi(() =>
         {
             _suppressEditorDirtyTracking = true;
             try
             {
-                lock (_sync)
-                {
-                    _activeNoteId = note.NoteId;
-                    _activeCreatedAtUtc = note.CreatedAtUtc;
-                    _isDirty = false;
-                }
-
-                _copyFeedbackTimer.Cancel();
                 IsCopiedFeedbackActive = false;
                 IsCopyError = false;
+                IsSavedFeedbackActive = false;
+                HasUnsavedChanges = false;
                 ActiveIsPinned = note.IsPinned;
                 ActiveTitle = note.Title;
                 EditorContent = note.ContentText;
@@ -670,6 +879,8 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
                 OnPropertyChanged(nameof(ActiveNoteId));
                 OnPropertyChanged(nameof(HasActiveNote));
                 OnPropertyChanged(nameof(PinActiveActionLabel));
+                OnPropertyChanged(nameof(PinButtonLabel));
+                OnPropertyChanged(nameof(SaveActiveActionLabel));
                 OnPropertyChanged(nameof(AccessibleStatus));
             }
             finally
@@ -681,21 +892,25 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
 
     private void ClearEditor()
     {
+        lock (_sync)
+        {
+            _activeNoteId = null;
+            _activeCreatedAtUtc = default;
+            _isDirty = false;
+        }
+
+        _copyFeedbackTimer.Cancel();
+        _saveFeedbackTimer.Cancel();
+
         DispatchToUi(() =>
         {
             _suppressEditorDirtyTracking = true;
             try
             {
-                lock (_sync)
-                {
-                    _activeNoteId = null;
-                    _activeCreatedAtUtc = default;
-                    _isDirty = false;
-                }
-
-                _copyFeedbackTimer.Cancel();
                 IsCopiedFeedbackActive = false;
                 IsCopyError = false;
+                IsSavedFeedbackActive = false;
+                HasUnsavedChanges = false;
                 ActiveIsPinned = false;
                 ActiveTitle = "Quick notes";
                 EditorContent = string.Empty;
@@ -703,6 +918,9 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
                 WordCountLabel = "0 words";
                 OnPropertyChanged(nameof(ActiveNoteId));
                 OnPropertyChanged(nameof(HasActiveNote));
+                OnPropertyChanged(nameof(PinActiveActionLabel));
+                OnPropertyChanged(nameof(PinButtonLabel));
+                OnPropertyChanged(nameof(SaveActiveActionLabel));
                 OnPropertyChanged(nameof(AccessibleStatus));
             }
             finally
@@ -752,6 +970,10 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
             activeId = _activeNoteId;
         }
 
+        var selectedIndex = string.IsNullOrWhiteSpace(activeId)
+            ? -1
+            : Array.FindIndex(snapshot, n => string.Equals(n.NoteId, activeId, StringComparison.Ordinal));
+
         DispatchToUi(() =>
         {
             Notes.Clear();
@@ -771,7 +993,13 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
                     note.IsPinned ? $"Unpin note {note.Title}" : $"Pin note {note.Title}"));
             }
 
-            HasNotes = Notes.Count > 0;
+            var count = Notes.Count;
+            HasNotes = count > 0;
+            CanNavigateNotes = count > 1;
+            NoteCountLabel = count == 1 ? "1 note" : $"{count} notes";
+            SelectedPositionLabel = count == 0
+                ? "0/0"
+                : $"{(selectedIndex >= 0 ? selectedIndex + 1 : 1)}/{count}";
         });
     }
 

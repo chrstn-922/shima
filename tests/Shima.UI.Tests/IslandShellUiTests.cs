@@ -184,17 +184,21 @@ public sealed class IslandShellUiTests
         await host.RunAsync(() => harness.IslandWindow.Show());
         await host.PumpAsync();
 
-        var (collapsedPadding, activePadding, activeSpec, activeMargin) = await host.RunAsync(() =>
+        var (collapsedPadding, activePadding, activeSpec, activeMargin, collapsedPresenterVis) = await host.RunAsync(() =>
         {
+            harness.IslandWindow.SetCollapsedStatusContent(null);
+            var collapsedVis = ((FrameworkElement)harness.IslandWindow.FindName("CollapsedOverlayContentPresenter")).Visibility;
             harness.StateManager.SetCompactActive("shima.nowplaying", isActive: true, badgeText: "Playing");
             return (
                 (Thickness)harness.IslandWindow.FindResource("IslandCollapsedOverlayPadding"),
                 (Thickness)harness.IslandWindow.FindResource("IslandActivePillPadding"),
                 ConcaveNotchGeometryBuilder.ActiveSpec,
-                ((FrameworkElement)harness.IslandWindow.FindName("ActiveLayer")).Margin);
+                ((FrameworkElement)harness.IslandWindow.FindName("ActiveLayer")).Margin,
+                collapsedVis);
         });
         await host.PumpAsync();
 
+        collapsedPresenterVis.Should().Be(Visibility.Collapsed);
         collapsedPadding.Left.Should().Be(collapsedPadding.Right);
         (collapsedPadding.Left - ConcaveNotchGeometryBuilder.CollapsedSpec.EarRadiusDip).Should().BeGreaterOrEqualTo(10);
 

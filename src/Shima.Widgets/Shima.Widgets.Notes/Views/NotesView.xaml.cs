@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace Shima.Widgets.Notes.Views;
 
@@ -26,6 +27,18 @@ public partial class NotesView : UserControl
         });
     }
 
+    private void OnViewPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            if (_viewModel.HasActiveNote)
+            {
+                e.Handled = true;
+                _ = _viewModel.SaveActiveNoteAsync();
+            }
+        }
+    }
+
     private void OnInputGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
         _viewModel.NotifyInputFocusChanged(true);
 
@@ -37,8 +50,11 @@ public partial class NotesView : UserControl
         }
     }
 
-    private void OnNewNoteClicked(object sender, RoutedEventArgs e) =>
-        _ = _viewModel.CreateNewNoteAsync();
+    private async void OnNewNoteClicked(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.CreateNewNoteAsync().ConfigureAwait(true);
+        BringSelectedNoteIntoView();
+    }
 
     private void OnNoteRowClicked(object sender, RoutedEventArgs e)
     {
@@ -47,6 +63,21 @@ public partial class NotesView : UserControl
             _ = _viewModel.SelectNoteAsync(noteId);
         }
     }
+
+    private async void OnPreviousNoteClicked(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.SelectPreviousNoteAsync().ConfigureAwait(true);
+        BringSelectedNoteIntoView();
+    }
+
+    private async void OnNextNoteClicked(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.SelectNextNoteAsync().ConfigureAwait(true);
+        BringSelectedNoteIntoView();
+    }
+
+    private void OnSaveActiveClicked(object sender, RoutedEventArgs e) =>
+        _ = _viewModel.SaveActiveNoteAsync();
 
     private void OnPinActiveClicked(object sender, RoutedEventArgs e)
     {
@@ -67,5 +98,24 @@ public partial class NotesView : UserControl
         {
             _ = _viewModel.DeleteNoteAsync(activeId);
         }
+    }
+
+    private void BringSelectedNoteIntoView()
+    {
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                var selectedItem = _viewModel.Notes.FirstOrDefault(n => n.IsSelected);
+                if (selectedItem is null)
+                {
+                    return;
+                }
+
+                if (NotesItemsControl.ItemContainerGenerator.ContainerFromItem(selectedItem) is FrameworkElement container)
+                {
+                    container.BringIntoView();
+                }
+            }));
     }
 }

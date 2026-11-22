@@ -90,14 +90,18 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
         }
     }
 
-    public bool IsCollapsedBarVisible => BarVisualState != DeveloperBarVisualState.Hidden;
+    internal static bool IsBarVisibleState(DeveloperBarVisualState state) =>
+        state is not (DeveloperBarVisualState.Hidden or DeveloperBarVisualState.Idle);
+
+    public bool IsCollapsedBarVisible => IsBarVisibleState(BarVisualState);
 
     public double BarFillPercent => BarVisualState switch
     {
         DeveloperBarVisualState.Working => 55.0,
         DeveloperBarVisualState.Attention => 62.0,
-        DeveloperBarVisualState.Hidden => 0.0,
-        _ => 100.0
+        DeveloperBarVisualState.Finished => 100.0,
+        DeveloperBarVisualState.ErrorFailed => 100.0,
+        _ => 0.0
     };
 
     public string BarFillBrushKey => BarVisualState switch
@@ -934,11 +938,13 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
         {
             _context.Island.UpdateCompactPill(DeveloperWidgetModule.Id, compactBadgeText, compactPriority);
 
-            if ((previousBar == DeveloperBarVisualState.Hidden) != (nextBar == DeveloperBarVisualState.Hidden))
+            var wasBarVisible = IsBarVisibleState(previousBar);
+            var isBarVisible = IsBarVisibleState(nextBar);
+            if (wasBarVisible != isBarVisible)
             {
                 _context.Events.Publish(new CollapsedStatusIndicatorChangedEvent(
                     DeveloperWidgetModule.Id,
-                    nextBar != DeveloperBarVisualState.Hidden));
+                    isBarVisible));
             }
         }
 

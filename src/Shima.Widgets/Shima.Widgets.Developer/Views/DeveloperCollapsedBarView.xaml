@@ -5,6 +5,8 @@
              AutomationProperties.Name="{Binding BarAccessibleStatus}"
              AutomationProperties.AutomationId="DeveloperCollapsedBarView">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
         <Style x:Key="CollapsedAgentBarStyle" TargetType="ProgressBar">
             <Setter Property="Height" Value="4" />
             <Setter Property="Minimum" Value="0" />
@@ -49,6 +51,7 @@
 
     <ProgressBar Style="{StaticResource CollapsedAgentBarStyle}"
                  Value="{Binding BarFillPercent, Mode=OneWay}"
+                 Visibility="{Binding IsCollapsedBarVisible, Converter={StaticResource BoolToVis}}"
                  VerticalAlignment="Center"
                  AutomationProperties.Name="{Binding BarAccessibleStatus}"
                  AutomationProperties.AutomationId="DeveloperCollapsedProgressBar" />

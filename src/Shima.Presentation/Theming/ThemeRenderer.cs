@@ -205,9 +205,21 @@ public sealed class ThemeRenderer : IDisposable
         var textMutedColor = ParseMediaColor(activeChrome.SecondaryIconHex, Color.FromRgb(0x94, 0xA3, 0xB8));
 
         var expandedLuminance = _colorService.CalculateRelativeLuminance(expandedColor.R, expandedColor.G, expandedColor.B);
-        var focusRingColor = expandedLuminance > 0.45
+        var isLightExpanded = expandedLuminance > 0.45;
+        var focusRingColor = isLightExpanded
             ? Color.FromRgb(0x0F, 0x17, 0x2A)
             : Colors.White;
+
+        var scrollTrackColor = Color.FromArgb(0x00, 0x00, 0x00, 0x00);
+        var scrollThumbColor = isLightExpanded
+            ? Color.FromArgb(0x47, 0x47, 0x55, 0x69)
+            : Color.FromArgb(0x5C, 0x64, 0x74, 0x8B);
+        var scrollThumbHoverColor = isLightExpanded
+            ? Color.FromArgb(0x7A, 0x33, 0x41, 0x55)
+            : Color.FromArgb(0x99, 0x94, 0xA3, 0xB8);
+        var scrollThumbActiveColor = isLightExpanded
+            ? Color.FromArgb(0xB3, 0x1E, 0x29, 0x3B)
+            : Color.FromArgb(0xD9, 0xCB, 0xD5, 0xE1);
 
         var updates = new (string ColorKey, string BrushKey, Color Value)[]
         {
@@ -218,7 +230,11 @@ public sealed class ThemeRenderer : IDisposable
             ("GlowColor", "GlowBrush", glowColor),
             ("TextPrimaryColor", "TextPrimary", textPrimaryColor),
             ("TextMutedColor", "TextMuted", textMutedColor),
-            ("FocusRingColor", "FocusRingBrush", focusRingColor)
+            ("FocusRingColor", "FocusRingBrush", focusRingColor),
+            ("ScrollBarTrackColor", "ScrollBarTrackBrush", scrollTrackColor),
+            ("ScrollBarThumbColor", "ScrollBarThumbBrush", scrollThumbColor),
+            ("ScrollBarThumbHoverColor", "ScrollBarThumbHoverBrush", scrollThumbHoverColor),
+            ("ScrollBarThumbActiveColor", "ScrollBarThumbActiveBrush", scrollThumbActiveColor)
         };
 
         var borderThickness = new Thickness(Math.Clamp(config.BorderThicknessDip, 0.0, 4.0));

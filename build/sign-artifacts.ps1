@@ -17,7 +17,11 @@ param(
 
     [switch]$SkipTimestamp,
 
-    [switch]$CreateDevSelfSignedCert
+    [switch]$CreateDevSelfSignedCert,
+
+    [string]$Subject = 'CN=Shima',
+
+    [switch]$AllowUntrustedSelfSigned
 )
 
 Set-StrictMode -Version Latest
@@ -62,7 +66,7 @@ try {
         $securePwd = ConvertTo-SecureString -String $PfxPassword -AsPlainText -Force
         $cert = New-SelfSignedCertificate `
             -Type Custom `
-            -Subject 'CN=Shima' `
+            -Subject $Subject `
             -KeyUsage DigitalSignature `
             -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}') `
             -CertStoreLocation 'Cert:\CurrentUser\My' `
@@ -75,6 +79,8 @@ try {
     if ([string]::IsNullOrWhiteSpace($PfxPath) -and [string]::IsNullOrWhiteSpace($CertThumbprint)) {
         throw "Provide either -PfxPath, -CertThumbprint, or -CreateDevSelfSignedCert."
     }
+
+    $allowSelfSignedVerify = $usedDevSelfSigned -or $AllowUntrustedSelfSigned.IsPresent
 
     foreach ($artifactPath in $Paths) {
         if (-not (Test-Path $artifactPath)) {
@@ -104,11 +110,12 @@ try {
             throw "SignTool failed for '$artifactPath' with exit code $LASTEXITCODE."
         }
 
-        if ($usedDevSelfSigned) {
-            & $signTool verify /v /kp $artifactPath | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "Verified embedded Authenticode signature structure on '$artifactPath' (dev self-signed)."
+        if ($allowSelfSignedVerify) {
+            $sig = Get-AuthenticodeSignature -FilePath $artifactPath
+            if ($null -eq $sig -or $null -eq $sig.SignerCertificate -or $sig.Status -in @([System.Management.Automation.SignatureStatus]::NotSigned, [System.Management.Automation.SignatureStatus]::HashMismatch)) {
+                throw "Embedded self-signed Authenticode verification failed for '$artifactPath' (Status=$($sig.Status))."
             }
+            Write-Host "Verified embedded Authenticode signature structure on '$artifactPath' (dev self-signed, thumbprint $($sig.SignerCertificate.Thumbprint))."
         }
         else {
             & $signTool verify /pa $artifactPath

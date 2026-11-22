@@ -19,7 +19,8 @@ public sealed class NotesWidgetModule : IWidgetModule
         IClipboardMonitorAdapter? clipboardAdapter = null,
         Func<DateTimeOffset>? utcNowProvider = null,
         INotesDebounceTimer? debounceTimer = null,
-        IOneShotTimer? copyFeedbackTimer = null)
+        IOneShotTimer? copyFeedbackTimer = null,
+        IOneShotTimer? saveFeedbackTimer = null)
     {
         ArgumentNullException.ThrowIfNull(repository);
         _ownsDebounceTimer = debounceTimer is null;
@@ -30,7 +31,8 @@ public sealed class NotesWidgetModule : IWidgetModule
             clipboardAdapter,
             utcNowProvider,
             copyTextOverride: null,
-            copyFeedbackTimer);
+            copyFeedbackTimer,
+            saveFeedbackTimer);
     }
 
     public WidgetDescriptor Metadata { get; } = new()
@@ -63,6 +65,7 @@ public sealed class NotesWidgetModule : IWidgetModule
     public async Task DeactivateAsync()
     {
         ViewModel.ClearCopyFeedback();
+        ViewModel.ClearSaveFeedback();
         ViewModel.NotifyInputFocusChanged(false);
         await ViewModel.FlushPendingSaveAsync(CancellationToken.None).ConfigureAwait(false);
     }
@@ -72,6 +75,7 @@ public sealed class NotesWidgetModule : IWidgetModule
         if (newState is IslandShellState.Collapsed or IslandShellState.Fullscreen or IslandShellState.Suspended)
         {
             ViewModel.ClearCopyFeedback();
+            ViewModel.ClearSaveFeedback();
             ViewModel.NotifyInputFocusChanged(false);
             _ = ViewModel.FlushPendingSaveAsync(CancellationToken.None);
         }
@@ -82,6 +86,7 @@ public sealed class NotesWidgetModule : IWidgetModule
         if (profile == PowerProfile.DisplayOff)
         {
             ViewModel.ClearCopyFeedback();
+            ViewModel.ClearSaveFeedback();
             ViewModel.NotifyInputFocusChanged(false);
             _ = ViewModel.FlushPendingSaveAsync(CancellationToken.None);
         }

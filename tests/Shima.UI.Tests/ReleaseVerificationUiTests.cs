@@ -5,8 +5,12 @@ using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
+using NSubstitute;
 using Shima.Core.Appearance;
 using Shima.Core.Color;
 using Shima.Core.Contracts;
@@ -14,10 +18,20 @@ using Shima.Core.Shell;
 using Shima.Infrastructure.Appearance;
 using Shima.Infrastructure.Color;
 using Shima.Infrastructure.Configuration;
+using Shima.Infrastructure.Persistence;
+using Shima.Infrastructure.Repositories;
 using Shima.Infrastructure.Services;
 using Shima.Infrastructure.Storage;
 using Shima.Presentation.Settings;
 using Shima.Presentation.Theming;
+using Shima.Widgets.Clipboard;
+using Shima.Widgets.Clipboard.Views;
+using Shima.Widgets.Inbox;
+using Shima.Widgets.Inbox.Views;
+using Shima.Widgets.Notes;
+using Shima.Widgets.Notes.Views;
+using Shima.WindowsInterop.Clipboard;
+using Shima.WindowsInterop.Notifications;
 using Shima.WindowsInterop.Overlay;
 using Xunit;
 
@@ -191,6 +205,269 @@ public sealed class ReleaseVerificationUiTests
             var expandedCenter = expanded.Left + expanded.Width / 2.0;
             Math.Abs(expandedCenter - monitorCenter).Should().BeLessOrEqualTo(1.0);
         }
+    }
+
+    [Fact]
+    public async Task ThemeTokens_GlobalScrollBarStyle_AppliesSlimPillWithNoArrows_AcrossWidgetsAndSettings()
+    {
+        var rootDir = IoPath.Combine(IoPath.GetTempPath(), "shima-scrollbar-ui-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDir);
+
+        try
+        {
+            var dbPath = IoPath.Combine(rootDir, "shima.db");
+            var migrations = new SqliteMigrationRunner(dbPath);
+            await migrations.InitializeAsync();
+
+            var noteRepo = new NoteRepository(dbPath);
+            var clipRepo = new ClipboardRepository(dbPath, rootDir);
+            var inboxRepo = new InboxRepository(dbPath, rootDir);
+            var now = new DateTimeOffset(2026, 11, 22, 16, 10, 0, TimeSpan.Zero);
+
+            for (var i = 1; i <= 6; i++)
+            {
+                await noteRepo.UpsertAsync(new NoteEntry
+                {
+                    NoteId = $"n{i}",
+                    Title = $"Note {i}",
+                    ContentText = string.Join(Environment.NewLine, Enumerable.Range(1, 15).Select(l => $"Note {i} line {l}")),
+                    CreatedAtUtc = now.AddMinutes(-i),
+                    UpdatedAtUtc = now.AddMinutes(i)
+                });
+                await clipRepo.TryAddEntryAsync(new ClipboardEntry
+                {
+                    EntryId = $"c{i}",
+                    ContentType = ClipboardContentType.Text,
+                    TextContent = $"Clip entry {i}",
+                    ContentHash = $"hash-{i}",
+                    ByteSize = 12,
+                    CopiedAtUtc = now.AddMinutes(i)
+                });
+                await inboxRepo.UpsertToastAsync(new InboxNotificationItem
+                {
+                    NotificationId = $"i{i}",
+                    AppId = $"app.{i}",
+                    AppName = $"App {i}",
+                    Title = $"Alert {i}",
+                    BodyText = $"Message {i}",
+                    ReceivedAtUtc = now.AddMinutes(i)
+                });
+            }
+
+            var prefsStore = new AppPreferencesStore(new AtomicConfigStore<AppPreferences>(rootDir));
+            var prefsService = new AppPreferencesService(prefsStore, new DpapiSecretStore());
+            await prefsService.InitializeAsync();
+
+            var colorService = new ColorProcessingService();
+            var pinController = new OverlayPinController();
+            var presetManager = new PresetManager(
+                new AtomicPresetCatalogRepository(new AtomicConfigStore<PresetCatalog>(rootDir)),
+                colorService);
+            var appearanceManager = new AppearanceManager(
+                new AtomicAppearanceConfigRepository(new AtomicConfigStore<AppearanceConfiguration>(rootDir)),
+                presetManager,
+                colorService,
+                pinController);
+            await appearanceManager.InitializeAsync();
+            var diagService = new DiagnosticLogService(IoPath.Combine(rootDir, "logs"));
+
+            var clipAdapter = Substitute.For<IClipboardMonitorAdapter>();
+            var inboxAdapter = Substitute.For<INotificationListenerAdapter>();
+            inboxAdapter.GetAccessStateAsync(Arg.Any<CancellationToken>()).Returns(NotificationAccessState.Allowed);
+
+            await using (var notesModule = new NotesWidgetModule(noteRepo, clipAdapter, () => now))
+            await using (var clipModule = new ClipboardWidgetModule(clipAdapter, clipRepo, prefsService, () => now))
+            await using (var inboxModule = new InboxWidgetModule(inboxAdapter, inboxRepo, prefsService, utcNowProvider: () => now))
+            {
+                var dummyContext = CreateDummyWidgetContext("widget");
+                await notesModule.InitializeAsync(dummyContext, CancellationToken.None);
+                await clipModule.InitializeAsync(dummyContext, CancellationToken.None);
+                await inboxModule.InitializeAsync(dummyContext, CancellationToken.None);
+
+                await notesModule.ViewModel.CreateNewNoteAsync();
+                notesModule.ViewModel.EditorContent = string.Join(
+                    Environment.NewLine,
+                    Enumerable.Range(1, 15).Select(l => $"eyes cant lie line {l}"));
+                (await notesModule.ViewModel.SaveActiveNoteAsync()).Should().BeTrue();
+                (await noteRepo.GetAllAsync()).Should().HaveCount(7);
+                notesModule.ViewModel.NoteCountLabel.Should().Be("7 notes");
+
+                using var host = new StaWpfTestHost();
+                var (settingsScrollBars, widgetScrollBars, lightThumbColor, darkThumbColor) = await host.RunAsync(() =>
+                {
+                    var themeDict = new ResourceDictionary
+                    {
+                        Source = new Uri("/Shima.Presentation;component/Theming/ThemeTokens.xaml", UriKind.Relative)
+                    };
+                    if (Application.Current is not null
+                        && !Application.Current.Resources.MergedDictionaries.Any(d => d.Source == themeDict.Source))
+                    {
+                        Application.Current.Resources.MergedDictionaries.Add(themeDict);
+                    }
+
+                    var themeRenderer = new ThemeRenderer(appearanceManager, colorService, Dispatcher.CurrentDispatcher);
+                    themeRenderer.AttachResourceDictionary(themeDict);
+
+                    // Dark theme check
+                    themeRenderer.ApplyNow();
+                    var darkThumb = ((SolidColorBrush)themeDict["ScrollBarThumbBrush"]).Color;
+
+                    // Simulate light expanded surface palette check
+                    var lightSession = appearanceManager.BeginEditingSession(acquireLivePreviewPin: false);
+                    lightSession.UpdateToken(AppearanceTokenSlot.Background, IslandStateTarget.Expanded, "#F8FAFC");
+                    themeRenderer.ApplyNow();
+                    var lightThumb = ((SolidColorBrush)themeDict["ScrollBarThumbBrush"]).Color;
+                    lightSession.Cancel();
+                    themeRenderer.ApplyNow();
+
+                    var settings = new SettingsWindow(
+                        appearanceManager,
+                        presetManager,
+                        colorService,
+                        prefsService,
+                        diagService,
+                        themeRenderer: themeRenderer)
+                    {
+                        ShowInTaskbar = false,
+                        ShowActivated = false,
+                        Left = -20000,
+                        Top = -20000
+                    };
+                    settings.Show();
+                    settings.SelectSection("General");
+                    Find<TextBox>(settings, "DiagnosticsLogViewer").Text = string.Join(
+                        Environment.NewLine,
+                        Enumerable.Range(1, 30).Select(i => $"Log {i}: " + new string('X', 240)));
+                    settings.UpdateLayout();
+
+                    var settingsBars = InspectScrollBars(settings);
+
+                    var notesView = (NotesView)notesModule.CreateExpandedView();
+                    var inboxView = (InboxView)inboxModule.CreateExpandedView();
+                    var clipView = (ClipboardView)clipModule.CreateExpandedView();
+
+                    var widgetBarSummaries = new List<(string ViewName, Orientation Orientation, double Width, int ArrowButtons, double PillCornerRadius, bool IsVisible)>();
+                    foreach (var (name, ctrl) in new (string, UserControl)[]
+                             {
+                                 ("Notes", notesView),
+                                 ("Inbox", inboxView),
+                                 ("Clipboard", clipView)
+                             })
+                    {
+                        var hostWindow = new Window
+                        {
+                            Width = 348,
+                            Height = 140,
+                            WindowStyle = WindowStyle.None,
+                            ResizeMode = ResizeMode.NoResize,
+                            ShowInTaskbar = false,
+                            ShowActivated = false,
+                            Left = -20000,
+                            Top = -20000,
+                            Content = ctrl
+                        };
+                        hostWindow.Resources.MergedDictionaries.Add(themeDict);
+                        hostWindow.Show();
+                        hostWindow.UpdateLayout();
+
+                        widgetBarSummaries.AddRange(InspectScrollBars(hostWindow).Select(b => (name, b.Orientation, b.Width, b.ArrowButtons, b.PillCornerRadius, b.IsVisible)));
+                        hostWindow.Close();
+                    }
+
+                    settings.Close();
+                    return (settingsBars, widgetBarSummaries, lightThumb, darkThumb);
+                });
+
+                lightThumbColor.Should().NotBe(darkThumbColor);
+
+                settingsScrollBars.Should().NotBeEmpty();
+                settingsScrollBars.Should().Contain(b => b.Orientation == Orientation.Vertical && b.IsVisible);
+                settingsScrollBars.Should().Contain(b => b.Orientation == Orientation.Horizontal && b.IsVisible);
+                foreach (var bar in settingsScrollBars)
+                {
+                    bar.Width.Should().BeLessOrEqualTo(6.5);
+                    bar.ArrowButtons.Should().Be(0);
+                    bar.PillCornerRadius.Should().Be(3.0);
+                }
+
+                // Notes has both list ScrollViewer + editor TextBox ScrollViewer; Inbox & Clipboard also have ScrollViewers
+                widgetScrollBars.Select(b => b.ViewName).Distinct().Should().Contain(["Notes", "Inbox", "Clipboard"]);
+                widgetScrollBars.Count(b => b.ViewName == "Notes" && b.Orientation == Orientation.Vertical && b.IsVisible).Should().Be(2);
+                widgetScrollBars.Should().Contain(b => b.ViewName == "Inbox" && b.Orientation == Orientation.Vertical && b.IsVisible);
+                widgetScrollBars.Should().Contain(b => b.ViewName == "Clipboard" && b.Orientation == Orientation.Vertical && b.IsVisible);
+                foreach (var bar in widgetScrollBars)
+                {
+                    bar.Width.Should().BeLessOrEqualTo(6.5);
+                    bar.ArrowButtons.Should().Be(0);
+                    bar.PillCornerRadius.Should().Be(3.0);
+                }
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(rootDir))
+            {
+                Directory.Delete(rootDir, recursive: true);
+            }
+        }
+    }
+
+    private static IReadOnlyList<(Orientation Orientation, double Width, int ArrowButtons, double PillCornerRadius, bool IsVisible)> InspectScrollBars(DependencyObject root)
+    {
+        var results = new List<(Orientation Orientation, double Width, int ArrowButtons, double PillCornerRadius, bool IsVisible)>();
+        foreach (var bar in FindAllDescendants<ScrollBar>(root))
+        {
+            bar.ApplyTemplate();
+            var arrowCount = FindAllDescendants<RepeatButton>(bar)
+                .Count(rb => rb.Command == ScrollBar.LineUpCommand
+                          || rb.Command == ScrollBar.LineDownCommand
+                          || rb.Command == ScrollBar.LineLeftCommand
+                          || rb.Command == ScrollBar.LineRightCommand);
+
+            var thumb = FindAllDescendants<Thumb>(bar).FirstOrDefault();
+            thumb?.ApplyTemplate();
+            var corner = thumb is not null
+                ? FindAllDescendants<Border>(thumb).Select(b => b.CornerRadius.TopLeft).FirstOrDefault()
+                : 0.0;
+
+            var dim = bar.Orientation == Orientation.Vertical ? bar.Width : bar.Height;
+            results.Add((bar.Orientation, dim, arrowCount, corner, bar.IsVisible));
+        }
+
+        return results;
+    }
+
+    private static IEnumerable<T> FindAllDescendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T typed)
+            {
+                yield return typed;
+            }
+
+            foreach (var nested in FindAllDescendants<T>(child))
+            {
+                yield return nested;
+            }
+        }
+    }
+
+    private static IWidgetContext CreateDummyWidgetContext(string widgetId)
+    {
+        var store = Substitute.For<IWidgetSettingsStore>();
+        store.ReadJsonAsync(Arg.Any<CancellationToken>()).Returns("{}");
+        var ctx = Substitute.For<IWidgetContext>();
+        ctx.WidgetId.Returns(widgetId);
+        ctx.Events.Returns(Substitute.For<IEventDispatcher>());
+        ctx.Settings.Returns(store);
+        ctx.Theme.Returns(Substitute.For<IThemeTokenProvider>());
+        ctx.Island.Returns(Substitute.For<IIslandAttentionRequester>());
+        ctx.Logger.Returns(Substitute.For<ILogger>());
+        return ctx;
     }
 
     private static T Find<T>(FrameworkElement root, string name) where T : class =>

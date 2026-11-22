@@ -427,6 +427,192 @@ public sealed class ProductivityWidgetsTests
     }
 
     [Fact]
+    public async Task NotesWidgetViewModel_CreatingSixNotesAndClickingSave_PreservesAllNotesWithoutEviction_NavigatesPrevNext_AndShowsSavedFeedback()
+    {
+        var clock = new DateTimeOffset(2026, 11, 22, 15, 59, 0, TimeSpan.Zero);
+        var repo = new InMemoryNoteRepository();
+        var debounceTimer = new FakeNotesDebounceTimer();
+        var saveFeedbackTimer = new FakeOneShotTimer();
+
+        using var vm = new NotesWidgetViewModel(
+            repo,
+            debounceTimer,
+            clipboardAdapter: null,
+            utcNowProvider: () =>
+            {
+                clock = clock.AddSeconds(10);
+                return clock;
+            },
+            saveFeedbackTimer: saveFeedbackTimer);
+
+        // Simulate asynchronous Dispatcher.BeginInvoke queueing to verify no active-note race occurs
+        var pendingUiActions = new Queue<Action>();
+        void FlushUiQueue()
+        {
+            while (pendingUiActions.TryDequeue(out var next))
+            {
+                next();
+            }
+        }
+
+        vm.AttachUiDispatcher(action => pendingUiActions.Enqueue(action));
+        await vm.InitializeAsync(CreateContext(NotesWidgetModule.Id), CancellationToken.None);
+        FlushUiQueue();
+
+        var contents = new[]
+        {
+            "eyes cant lie",
+            "second note content",
+            "tol",
+            "fourth note content",
+            "fifth note content",
+            "sixth note content"
+        };
+
+        foreach (var text in contents)
+        {
+            await vm.CreateNewNoteAsync();
+            FlushUiQueue();
+
+            vm.EditorContent = text;
+            vm.HasUnsavedChanges.Should().BeTrue();
+            vm.SaveButtonLabel.Should().Be("Save");
+            vm.SaveStatusLabel.Should().Be("Unsaved changes");
+
+            (await vm.SaveActiveNoteAsync()).Should().BeTrue();
+            FlushUiQueue();
+
+            vm.HasUnsavedChanges.Should().BeFalse();
+            vm.IsSavedFeedbackActive.Should().BeTrue();
+            vm.SaveButtonLabel.Should().Be("Saved");
+            vm.SaveStatusLabel.Should().Be("Saved");
+            saveFeedbackTimer.IsPending.Should().BeTrue();
+            saveFeedbackTimer.LastDelay.Should().Be(TimeSpan.FromMilliseconds(1500));
+
+            saveFeedbackTimer.Fire();
+            FlushUiQueue();
+            vm.IsSavedFeedbackActive.Should().BeFalse();
+            vm.SaveButtonLabel.Should().Be("Save");
+        }
+
+        var stored = await repo.GetAllAsync();
+        stored.Should().HaveCount(6);
+        stored.Select(n => n.ContentText).Should().Contain(contents);
+        vm.Notes.Should().HaveCount(6);
+        vm.Notes.Select(n => n.Title).Should().Contain("eyes cant lie").And.Contain("tol");
+        vm.NoteCountLabel.Should().Be("6 notes");
+        vm.SelectedPositionLabel.Should().Be("1/6");
+        vm.CanNavigateNotes.Should().BeTrue();
+        vm.Notes.Count(n => n.IsSelected).Should().Be(1);
+        vm.Notes[0].IsSelected.Should().BeTrue();
+
+        // Step next through all 6 notes to reach the oldest note ("eyes cant lie") and wrap around
+        for (var step = 1; step < 6; step++)
+        {
+            await vm.SelectNextNoteAsync();
+            FlushUiQueue();
+            vm.SelectedPositionLabel.Should().Be($"{step + 1}/6");
+        }
+
+        vm.EditorContent.Should().Be("eyes cant lie");
+        vm.Notes[5].IsSelected.Should().BeTrue();
+
+        // Step next from 6/6 wraps cleanly to 1/6; step previous wraps back to 6/6
+        await vm.SelectNextNoteAsync();
+        FlushUiQueue();
+        vm.SelectedPositionLabel.Should().Be("1/6");
+
+        await vm.SelectPreviousNoteAsync();
+        FlushUiQueue();
+        vm.SelectedPositionLabel.Should().Be("6/6");
+        vm.EditorContent.Should().Be("eyes cant lie");
+    }
+
+    [Fact]
+    public async Task NotesView_ActionButtonsSaveSwitcherAndSixNotes_FitInside348x140WithoutClippingOnStaDispatcher()
+    {
+        var clock = new DateTimeOffset(2026, 11, 22, 16, 0, 0, TimeSpan.Zero);
+        var repo = new InMemoryNoteRepository();
+        await using var notes = new NotesWidgetModule(
+            repo,
+            utcNowProvider: () =>
+            {
+                clock = clock.AddSeconds(5);
+                return clock;
+            });
+        await notes.InitializeAsync(CreateContext(NotesWidgetModule.Id), CancellationToken.None);
+
+        for (var i = 1; i <= 6; i++)
+        {
+            await notes.ViewModel.CreateNewNoteAsync();
+            notes.ViewModel.EditorContent = $"Note {i} title\nBody line for note {i}";
+            await notes.ViewModel.SaveActiveNoteAsync();
+        }
+
+        Exception? staException = null;
+        var completed = new ManualResetEventSlim(false);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var notesView = notes.CreateExpandedView().Should().BeOfType<NotesView>().Subject;
+                notesView.Measure(new Size(348, 140));
+                notesView.Arrange(new Rect(0, 0, 348, 140));
+                notesView.UpdateLayout();
+
+                var requiredButtonIds = new[]
+                {
+                    "NotesNewButton",
+                    "NotesPrevButton",
+                    "NotesNextButton",
+                    "NotesSaveButton",
+                    "NotesPinButton",
+                    "NotesCopyButton",
+                    "NotesDeleteButton"
+                };
+
+                foreach (var id in requiredButtonIds)
+                {
+                    var button = FindVisualDescendants<Button>(notesView)
+                        .Single(b => AutomationProperties.GetAutomationId(b) == id);
+                    button.Visibility.Should().Be(Visibility.Visible);
+                    button.ActualWidth.Should().BeGreaterThan(0);
+                    button.ActualHeight.Should().BeGreaterThan(0);
+
+                    var topLeft = button.TranslatePoint(new Point(0, 0), notesView);
+                    var bottomRight = button.TranslatePoint(new Point(button.ActualWidth, button.ActualHeight), notesView);
+                    topLeft.X.Should().BeGreaterOrEqualTo(-0.1);
+                    topLeft.Y.Should().BeGreaterOrEqualTo(-0.1);
+                    bottomRight.X.Should().BeLessOrEqualTo(348.1);
+                    bottomRight.Y.Should().BeLessOrEqualTo(140.1);
+                }
+
+                var countText = FindVisualDescendants<TextBlock>(notesView)
+                    .Single(tb => AutomationProperties.GetAutomationId(tb) == "NotesCountText");
+                countText.Text.Should().Be("6 notes");
+
+                var positionText = FindVisualDescendants<TextBlock>(notesView)
+                    .Single(tb => AutomationProperties.GetAutomationId(tb) == "NotesPositionText");
+                positionText.Text.Should().Be("1/6");
+            }
+            catch (Exception ex)
+            {
+                staException = ex;
+            }
+            finally
+            {
+                Dispatcher.CurrentDispatcher.InvokeShutdown();
+                completed.Set();
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        completed.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
+        staException.Should().BeNull();
+    }
+
+    [Fact]
     public async Task InboxWidgetModule_IdentityUnavailableDndSuppressionExclusionsAndSyncToggle_WorkCleanly()
     {
         var now = new DateTimeOffset(2026, 11, 22, 11, 0, 0, TimeSpan.Zero);

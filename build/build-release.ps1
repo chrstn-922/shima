@@ -28,6 +28,8 @@ param(
 
     [switch]$SkipTimestamp,
 
+    [switch]$CreateDevSelfSignedCert,
+
     [switch]$RequireVelopack
 )
 
@@ -108,7 +110,41 @@ $fourPartVersion = switch ($versionParts.Count) {
     default { "$($versionParts[0]).$($versionParts[1]).$($versionParts[2]).$($versionParts[3])" }
 }
 
-$manifestPackages = @()
+if ($CreateDevSelfSignedCert -and -not $Sign) {
+    $Sign = $true
+}
+
+$createdDevCertThumbprint = $null
+$createdDevPfxPath = $null
+$allowUntrustedSelfSigned = $false
+
+try {
+    if ($Sign -and $CreateDevSelfSignedCert -and [string]::IsNullOrWhiteSpace($PfxPath) -and [string]::IsNullOrWhiteSpace($CertThumbprint)) {
+        $devCertDir = Join-Path $repoRoot 'artifacts\dev-cert'
+        New-Item -ItemType Directory -Force -Path $devCertDir | Out-Null
+        $PfxPath = Join-Path $devCertDir 'shima-dev.pfx'
+        $createdDevPfxPath = $PfxPath
+
+        if ([string]::IsNullOrWhiteSpace($PfxPassword)) {
+            $PfxPassword = [Guid]::NewGuid().ToString('N')
+        }
+
+        $securePwd = ConvertTo-SecureString -String $PfxPassword -AsPlainText -Force
+        $devCert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject $Publisher `
+            -KeyUsage DigitalSignature `
+            -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}') `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -NotAfter (Get-Date).AddYears(1)
+
+        $createdDevCertThumbprint = $devCert.Thumbprint
+        $allowUntrustedSelfSigned = $true
+        Export-PfxCertificate -Cert $devCert -FilePath $PfxPath -Password $securePwd | Out-Null
+        Write-Host "Generated session dev self-signed code-signing certificate ($Publisher, Thumbprint=$createdDevCertThumbprint)."
+    }
+
+    $manifestPackages = @()
 
 foreach ($rid in $Runtimes) {
     $msixArch = switch ($rid.ToLowerInvariant()) {
@@ -253,7 +289,7 @@ foreach ($rid in $Runtimes) {
             $msixPath,
             $bundledMsixPath
         )
-        & $signScriptPath -Paths $signTargets -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp
+        & $signScriptPath -Paths $signTargets -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp -AllowUntrustedSelfSigned:$allowUntrustedSelfSigned
     }
 
     $zipPath = Join-Path $releaseDir "Shima-$Version-$rid.zip"
@@ -276,7 +312,7 @@ foreach ($rid in $Runtimes) {
         $setupExe = Get-ChildItem -Path $releaseDir -Filter '*-Setup.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($null -ne $setupExe) {
             if ($Sign) {
-                & $signScriptPath -Paths @($setupExe.FullName) -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp
+                & $signScriptPath -Paths @($setupExe.FullName) -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp -AllowUntrustedSelfSigned:$allowUntrustedSelfSigned
             }
             $primaryArtifactPath = $setupExe.FullName
         }
@@ -302,7 +338,7 @@ foreach ($rid in $Runtimes) {
         }
 
         if ($Sign) {
-            & $signScriptPath -Paths @($expectedInstallerPath) -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp
+            & $signScriptPath -Paths @($expectedInstallerPath) -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp -AllowUntrustedSelfSigned:$allowUntrustedSelfSigned
         }
 
         $innoInstallerPath = $expectedInstallerPath
@@ -341,8 +377,17 @@ $manifestDocument = [ordered]@{
     packages       = $manifestPackages
 }
 
-$manifestOutPath = Join-Path $releasesRoot "manifest-$Channel.json"
-$manifestJson = $manifestDocument | ConvertTo-Json -Depth 6
-[System.IO.File]::WriteAllText($manifestOutPath, $manifestJson, (New-Object System.Text.UTF8Encoding($false)))
+    $manifestOutPath = Join-Path $releasesRoot "manifest-$Channel.json"
+    $manifestJson = $manifestDocument | ConvertTo-Json -Depth 6
+    [System.IO.File]::WriteAllText($manifestOutPath, $manifestJson, (New-Object System.Text.UTF8Encoding($false)))
 
-Write-Host "Release manifest generated at '$manifestOutPath'."
+    Write-Host "Release manifest generated at '$manifestOutPath'."
+}
+finally {
+    if (-not [string]::IsNullOrWhiteSpace($createdDevCertThumbprint)) {
+        Remove-Item -Path "Cert:\CurrentUser\My\$createdDevCertThumbprint" -ErrorAction SilentlyContinue
+    }
+    if (-not [string]::IsNullOrWhiteSpace($createdDevPfxPath) -and (Test-Path $createdDevPfxPath)) {
+        Remove-Item -Path $createdDevPfxPath -Force -ErrorAction SilentlyContinue
+    }
+}

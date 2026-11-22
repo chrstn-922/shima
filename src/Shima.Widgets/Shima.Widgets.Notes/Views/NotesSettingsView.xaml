@@ -79,7 +79,7 @@
                            FontSize="11.5"
                            Foreground="{DynamicResource TextMuted}"
                            TextWrapping="Wrap"
-                           Text="Notes auto-save locally within 500 ms to your encrypted user profile folder (200 KB max per note)." />
+                           Text="Click Save (or press Ctrl+S) to commit notes immediately; drafts also auto-save locally within 500 ms and on collapse (200 KB max per note)." />
             </StackPanel>
         </Border>
     </StackPanel>

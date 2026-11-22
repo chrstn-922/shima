@@ -716,19 +716,24 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         var context = CreateWidgetContext(events, requester);
         await module.InitializeAsync(context, CancellationToken.None);
 
-        // 1. Disabled/Unconfigured -> Hidden bar, idle empty state "No active sessions"
+        // 1. Disabled/Unconfigured -> Hidden bar (no collapsed status view), idle empty state "No active sessions"
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Hidden);
         module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        module.ViewModel.BarFillPercent.Should().Be(0.0);
+        module.CreateCollapsedStatusView().Should().BeNull();
         module.ViewModel.IsEmpty.Should().BeTrue();
         module.ViewModel.EmptyStateLabel.Should().Be("No active sessions");
         module.ShouldAutoSelectOnExpand.Should().BeFalse();
 
-        // 2. Opt into OpenCode -> bar becomes Idle gray, default expand does NOT force Developer Activity
+        // 2. Opt into OpenCode with no running activity -> Idle state keeps collapsed bar hidden (no idle gray bar)
         await prefs.SaveAsync(new AppPreferencesSnapshot { OpenCodeOptInEnabled = true });
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
+        module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        module.ViewModel.BarFillPercent.Should().Be(0.0);
+        module.CreateCollapsedStatusView().Should().BeNull();
         module.ViewModel.BarFillBrushKey.Should().Be("AgentStatusIdleBrush");
         module.ShouldAutoSelectOnExpand.Should().BeFalse();
-        barVisibilityEvents.Should().Contain(e => e.IsVisible);
+        barVisibilityEvents.Should().NotContain(e => e.IsVisible);
 
         // 3. Working alongside Now Playing or Focus Timer -> yields compact pill priority while showing green Working bar
         requester.UpdateCompactPill("shima.music", "Spotify · Song");
@@ -741,8 +746,10 @@ public sealed class CodingAgentAdaptersTests : IDisposable
             "Implement parser", null, null, null, false, now, now));
 
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Working);
+        module.ViewModel.IsCollapsedBarVisible.Should().BeTrue();
         module.ViewModel.BarFillBrushKey.Should().Be("AgentStatusWorkingBrush");
         module.ViewModel.BarFillPercent.Should().BeLessThan(100.0);
+        barVisibilityEvents.Should().Contain(e => e.IsVisible);
         module.ShouldAutoSelectOnExpand.Should().BeTrue();
         stateManager.CompactActiveWidgetId.Should().Be("shima.focus"); // Yielded to active Focus Timer!
         requester.UpdateCompactPill("shima.focus", null);
@@ -799,9 +806,11 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         dwellTimer.IsPending.Should().BeTrue();
         dwellTimer.LastDelay.Should().Be(DeveloperWidgetViewModel.FinishedBarDwellDuration);
 
-        // Expire 10s dwell -> collapsed bar reverts to Idle gray, finished rows stay 15m in expanded list
+        // Expire 10s dwell -> collapsed bar hides again (Idle), finished rows stay 15m in expanded list
         dwellTimer.Fire();
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
+        module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        barVisibilityEvents[^1].IsVisible.Should().BeFalse();
         module.ViewModel.Sessions.Should().HaveCount(2);
 
         // 6. Fatal Error/Failed holds ErrorFailed bar until hovered or 15m cap; DisplayOff suspends all timers
@@ -820,16 +829,24 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         module.ViewModel.HasPendingTimers.Should().BeFalse();
         module.OnPowerProfileChanged(PowerProfile.AC);
 
-        // Hover collapsed bar acknowledges ErrorFailed -> reverts bar while retaining row for 15m
+        // Hover collapsed bar acknowledges ErrorFailed -> hides bar while retaining row for 15m
         module.OnCollapsedNotchHovered();
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
+        module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        barVisibilityEvents[^1].IsVisible.Should().BeFalse();
         module.ViewModel.Sessions.Should().Contain(s => s.SessionId == "opencode:err");
 
         // After 15m retention expiry -> rows purge leaving "No active sessions"
         module.ViewModel.PurgeExpiredRowsForTesting(now.AddMinutes(16));
         module.ViewModel.IsEmpty.Should().BeTrue();
+        module.CreateCollapsedStatusView().Should().BeNull();
 
-        // 7. STA WPF View instantiation check
+        // 7. STA WPF View instantiation check (emit active session so collapsed bar view is active, then verify Idle collapses it)
+        fakeOpenCode.EmitSession(new AgentSessionSnapshot(
+            "opencode:s2", "opencode", "shima", @"C:\repos\shima", null,
+            AgentStatus.Working, false, AgentConnectionState.Connected,
+            "Active build", null, null, null, false, now.AddMinutes(17), now.AddMinutes(17)));
+
         Exception? staException = null;
         var done = new ManualResetEventSlim(false);
         var staThread = new Thread(() =>
@@ -839,6 +856,7 @@ public sealed class CodingAgentAdaptersTests : IDisposable
                 var collapsedBar = module.CreateCollapsedStatusView().Should().BeOfType<DeveloperCollapsedBarView>().Subject;
                 collapsedBar.Measure(new Size(100, 12));
                 collapsedBar.Arrange(new Rect(0, 0, 100, 12));
+                collapsedBar.Visibility.Should().Be(Visibility.Visible);
 
                 var compactView = module.CreateCompactActiveView().Should().BeOfType<DeveloperCompactView>().Subject;
                 compactView.Measure(new Size(220, 32));

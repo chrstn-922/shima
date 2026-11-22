@@ -1,6 +1,7 @@
 <UserControl x:Class="Shima.Widgets.Notes.Views.NotesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             PreviewKeyDown="OnViewPreviewKeyDown"
              AutomationProperties.Name="{Binding AccessibleStatus}"
              AutomationProperties.AutomationId="NotesWidgetView">
     <UserControl.Resources>
@@ -11,7 +12,7 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Padding" Value="5,2" />
             <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
             <Setter Property="FontSize" Value="10.5" />
             <Setter Property="Cursor" Value="Hand" />
@@ -43,6 +44,21 @@
             </Setter>
         </Style>
 
+        <Style x:Key="NoteSaveButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource NoteActionButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSavedFeedbackActive}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="NoteCopyButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource NoteActionButtonStyle}">
@@ -59,8 +75,8 @@
             <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,4" />
-            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="Margin" Value="0,0,0,2" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -98,7 +114,7 @@
             <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Padding" Value="6,3" />
             <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
             <Setter Property="FontSize" Value="11.5" />
         </Style>
@@ -111,12 +127,14 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Left Pane: Search + New Note + List -->
+        <!-- Left Pane: Search + New Note + List + Switcher Footer -->
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="6" />
+                <RowDefinition Height="4" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="3" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0">
@@ -146,10 +164,12 @@
             </Grid>
 
             <Grid Grid.Row="2">
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                <ScrollViewer x:Name="NotesListScrollViewer"
+                              VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Visibility="{Binding HasNotes, Converter={StaticResource BoolToVis}}">
-                    <ItemsControl ItemsSource="{Binding Notes}"
+                    <ItemsControl x:Name="NotesItemsControl"
+                                  ItemsSource="{Binding Notes}"
                                   AutomationProperties.AutomationId="NotesList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -166,12 +186,12 @@
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="{Binding Title}"
                                                        FontFamily="{DynamicResource ShimaFontFamily}"
-                                                       FontSize="11.5"
+                                                       FontSize="11"
                                                        FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding UpdatedLabel}"
                                                        FontFamily="{DynamicResource ShimaFontFamily}"
-                                                       FontSize="10"
+                                                       FontSize="9.5"
                                                        Foreground="{DynamicResource TextMuted}" />
                                         </StackPanel>
 
@@ -198,6 +218,51 @@
                            Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}"
                            AutomationProperties.AutomationId="NotesEmptyText" />
             </Grid>
+
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding NoteCountLabel}"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="10"
+                           Foreground="{DynamicResource TextMuted}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.AutomationId="NotesCountText" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SelectedPositionLabel}"
+                               Margin="0,0,4,0"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="10"
+                               Foreground="{DynamicResource TextMuted}"
+                               VerticalAlignment="Center"
+                               AutomationProperties.AutomationId="NotesPositionText" />
+                    <Button Style="{StaticResource NoteActionButtonStyle}"
+                            Content="‹"
+                            Padding="5,0"
+                            Margin="0,0,2,0"
+                            IsEnabled="{Binding CanNavigateNotes}"
+                            Click="OnPreviousNoteClicked"
+                            ToolTip="Previous note"
+                            AutomationProperties.Name="Previous note"
+                            AutomationProperties.AutomationId="NotesPrevButton" />
+                    <Button Style="{StaticResource NoteActionButtonStyle}"
+                            Content="›"
+                            Padding="5,0"
+                            IsEnabled="{Binding CanNavigateNotes}"
+                            Click="OnNextNoteClicked"
+                            ToolTip="Next note"
+                            AutomationProperties.Name="Next note"
+                            AutomationProperties.AutomationId="NotesNextButton" />
+                </StackPanel>
+            </Grid>
         </Grid>
 
         <!-- Right Pane: Toolbar + Scratchpad Editor -->
@@ -210,12 +275,20 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Compact right-aligned action row: all three buttons always fully visible -->
+            <!-- Compact right-aligned action row: Save, Pin, Copy, Delete -->
             <StackPanel Grid.Row="0"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
+                <Button Style="{StaticResource NoteSaveButtonStyle}"
+                        Content="{Binding SaveButtonLabel}"
+                        Margin="0,0,3,0"
+                        IsEnabled="{Binding HasActiveNote}"
+                        Click="OnSaveActiveClicked"
+                        ToolTip="Save note (Ctrl+S)"
+                        AutomationProperties.Name="{Binding SaveActiveActionLabel}"
+                        AutomationProperties.AutomationId="NotesSaveButton" />
                 <Button Style="{StaticResource NoteActionButtonStyle}"
-                        Content="Pin"
+                        Content="{Binding PinButtonLabel}"
                         Margin="0,0,3,0"
                         IsEnabled="{Binding HasActiveNote}"
                         Click="OnPinActiveClicked"
@@ -253,6 +326,12 @@
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
                             <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSavedFeedbackActive}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                                </DataTrigger>
                                 <DataTrigger Binding="{Binding IsCopiedFeedbackActive}" Value="True">
                                     <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
                                 </DataTrigger>
