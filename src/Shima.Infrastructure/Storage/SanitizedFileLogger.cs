@@ -11,6 +11,10 @@ public sealed class SanitizedFileLogger : ILogger
         @"[\w.+-]+@[\w-]+\.[\w.-]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    private static readonly Regex LicenseTokenPattern = new(
+        @"SHIMA1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
     private readonly string _logFilePath;
@@ -70,6 +74,7 @@ public sealed class SanitizedFileLogger : ILogger
             text = text.Replace(forwardSlashProfile, "%USERPROFILE%", StringComparison.OrdinalIgnoreCase);
         }
 
-        return EmailPattern.Replace(text, "[redacted-email]");
+        var redactedEmail = EmailPattern.Replace(text, "[redacted-email]");
+        return LicenseTokenPattern.Replace(redactedEmail, "[redacted-license]");
     }
 }

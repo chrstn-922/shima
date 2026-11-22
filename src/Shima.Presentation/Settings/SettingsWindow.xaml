@@ -893,7 +893,7 @@
                 <!-- 9. Updates -->
                 <StackPanel x:Name="PanelUpdates" Visibility="Collapsed">
                     <TextBlock Style="{StaticResource SectionHeadingStyle}" Text="Updates" />
-                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Configure strictly offline mode and local update package checks." />
+                    <TextBlock Style="{StaticResource SectionSubheadingStyle}" Text="Configure strictly offline mode and signed local update package checks." />
 
                     <Border Style="{StaticResource SettingsCardStyle}">
                         <StackPanel>
@@ -901,12 +901,31 @@
                                       Content="Keep Shima strictly offline (disable update network checks)"
                                       Foreground="{DynamicResource TextPrimary}"
                                       Checked="OnBehaviorCheckChanged"
-                                      Unchecked="OnBehaviorCheckChanged" />
-                            <TextBlock Margin="22,6,0,0"
+                                      Unchecked="OnBehaviorCheckChanged"
+                                      AutomationProperties.AutomationId="UpdatesOfflineModeCheck" />
+                            <TextBlock x:Name="InstalledVersionText"
+                                       Margin="22,6,0,12"
                                        FontFamily="{DynamicResource ShimaFontFamily}"
                                        FontSize="11.5"
                                        Foreground="{DynamicResource TextMuted}"
-                                       Text="Installed runtime version: 0.1.0 (local-first desktop shell)" />
+                                       Text="Installed version: 1.0.0 (local-first desktop shell)"
+                                       AutomationProperties.AutomationId="InstalledVersionText" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <Button x:Name="CheckForUpdatesButton"
+                                        Content="Check for updates"
+                                        Style="{StaticResource SettingsPrimaryButtonStyle}"
+                                        Click="OnCheckForUpdatesClicked"
+                                        AutomationProperties.AutomationId="CheckForUpdatesButton" />
+                            </StackPanel>
+
+                            <TextBlock x:Name="UpdateStatusText"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="11.5"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       TextWrapping="Wrap"
+                                       Text="Update checks are manual and respect offline mode."
+                                       AutomationProperties.AutomationId="UpdateStatusText" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -926,7 +945,7 @@
 
                             <DockPanel LastChildFill="True" Margin="0,0,0,6">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Content="Save license key"
+                                    <Button Content="Activate license"
                                             Style="{StaticResource SettingsPrimaryButtonStyle}"
                                             Margin="8,0,6,0"
                                             Click="OnSaveLicenseClicked"

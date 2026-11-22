@@ -30,11 +30,16 @@
   </ItemGroup>
 
   <Target Name="CopyAgentBridgeOutputs" AfterTargets="Build">
-    <ItemGroup>
-      <AgentBridgeFiles Include="..\Shima.AgentBridge\bin\$(Configuration)\$(TargetFramework)\Shima.AgentBridge.*" />
+    <PropertyGroup>
+      <_AgentBridgeOutDir Condition="'$(RuntimeIdentifier)' != ''">..\Shima.AgentBridge\bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\</_AgentBridgeOutDir>
+      <_AgentBridgeOutDir Condition="'$(RuntimeIdentifier)' == ''">..\Shima.AgentBridge\bin\$(Configuration)\$(TargetFramework)\</_AgentBridgeOutDir>
+    </PropertyGroup>
+    <ItemGroup Condition="Exists('$(_AgentBridgeOutDir)')">
+      <AgentBridgeFiles Include="$(_AgentBridgeOutDir)Shima.AgentBridge.*" />
     </ItemGroup>
     <Copy SourceFiles="@(AgentBridgeFiles)"
           DestinationFolder="$(OutDir)"
-          SkipUnchangedFiles="true" />
+          SkipUnchangedFiles="true"
+          Condition="'@(AgentBridgeFiles)' != ''" />
   </Target>
 </Project>

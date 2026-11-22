@@ -147,6 +147,31 @@ public sealed class AppPreferencesService : IAppPreferencesService
         }
     }
 
+    public string? ReadLicenseStatePayload()
+    {
+        byte[]? ciphertext;
+        lock (_sync)
+        {
+            ciphertext = _raw.LicenseState;
+        }
+
+        if (ciphertext is null || ciphertext.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var plaintext = _secretStore.UnprotectForCurrentUser(ciphertext);
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (Exception exception)
+        {
+            _logger?.Warn("Unable to unprotect license payload from DPAPI store.", exception);
+            return null;
+        }
+    }
+
     public async Task ResetToDefaultsAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -207,6 +232,7 @@ public sealed class AppPreferencesService : IAppPreferencesService
 public sealed partial class DiagnosticLogService : IDiagnosticLogService
 {
     private static readonly Regex SecretPattern = CreateSecretPattern();
+    private static readonly Regex LicenseTokenPattern = CreateLicenseTokenPattern();
 
     public DiagnosticLogService(string? logDirectoryPath = null)
     {
@@ -294,9 +320,15 @@ public sealed partial class DiagnosticLogService : IDiagnosticLogService
         return outputPath;
     }
 
-    private static string SanitizeLine(string line) =>
-        SecretPattern.Replace(line, "$1=[REDACTED]");
+    private static string SanitizeLine(string line)
+    {
+        var redacted = SecretPattern.Replace(line, "$1=[REDACTED]");
+        return LicenseTokenPattern.Replace(redacted, "[REDACTED_LICENSE]");
+    }
 
     [GeneratedRegex(@"(?i)\b(password|passphrase|secret|token|bearer|api[_-]?key|authorization)\b\s*[:=]\s*[^\s,;]+", RegexOptions.Compiled)]
     private static partial Regex CreateSecretPattern();
+
+    [GeneratedRegex(@"SHIMA1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", RegexOptions.Compiled)]
+    private static partial Regex CreateLicenseTokenPattern();
 }

@@ -28,6 +28,8 @@ public partial class SettingsWindow : Window
     private readonly IWidgetSettingsCoordinator? _widgetCoordinator;
     private readonly IGlobalHotkeyService? _hotkeyService;
     private readonly ThemeRenderer? _themeRenderer;
+    private readonly IUpdateService? _updateService;
+    private readonly ILicenseService? _licenseService;
 
     private bool _isLoadingUi;
 
@@ -41,7 +43,9 @@ public partial class SettingsWindow : Window
         IStartupRegistrationAdapter? startupAdapter = null,
         IWidgetSettingsCoordinator? widgetCoordinator = null,
         IGlobalHotkeyService? hotkeyService = null,
-        ThemeRenderer? themeRenderer = null)
+        ThemeRenderer? themeRenderer = null,
+        IUpdateService? updateService = null,
+        ILicenseService? licenseService = null)
     {
         _appearanceManager = appearanceManager ?? throw new ArgumentNullException(nameof(appearanceManager));
         _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
@@ -53,6 +57,8 @@ public partial class SettingsWindow : Window
         _widgetCoordinator = widgetCoordinator;
         _hotkeyService = hotkeyService;
         _themeRenderer = themeRenderer;
+        _updateService = updateService;
+        _licenseService = licenseService;
 
         InitializeComponent();
 
@@ -334,12 +340,29 @@ public partial class SettingsWindow : Window
             ClearOpenCodePasswordButton.IsEnabled = prefs.HasOpenCodeServerPassword;
 
             UpdatesOfflineModeCheck.IsChecked = prefs.UpdatesOfflineMode;
+            InstalledVersionText.Text = _updateService is not null
+                ? $"Installed version: {_updateService.CurrentVersion} ({_updateService.CurrentArchitecture})"
+                : "Installed version: 1.0.0 (local-first desktop shell)";
+            UpdateStatusText.Text = prefs.UpdatesOfflineMode
+                ? "Offline mode is enabled — update checks are disabled."
+                : _updateService?.StagedUpdate is { } staged
+                    ? $"Update {staged.Version} ({staged.Architecture}) staged cleanly."
+                    : "Update checks are manual and respect offline mode.";
 
             LicenseKeyBox.Password = string.Empty;
-            LicenseStateText.Text = prefs.HasLicenseKey
-                ? "License key configured (DPAPI encrypted)"
-                : "Community offline edition — no license key stored";
-            ClearLicenseKeyButton.IsEnabled = prefs.HasLicenseKey;
+            if (_licenseService is not null)
+            {
+                var status = _licenseService.GetCachedStatus();
+                LicenseStateText.Text = status.Message;
+                ClearLicenseKeyButton.IsEnabled = status.State != LicenseStateKind.CommunityOffline || prefs.HasLicenseKey;
+            }
+            else
+            {
+                LicenseStateText.Text = prefs.HasLicenseKey
+                    ? "License key configured (DPAPI encrypted)"
+                    : "Community offline edition — no license key stored";
+                ClearLicenseKeyButton.IsEnabled = prefs.HasLicenseKey;
+            }
         }
         finally
         {
@@ -581,6 +604,12 @@ public partial class SettingsWindow : Window
         if (IsLoaded && !_isLoadingUi)
         {
             await SavePreferencesFromControlsAsync().ConfigureAwait(true);
+            if (ReferenceEquals(sender, UpdatesOfflineModeCheck))
+            {
+                UpdateStatusText.Text = UpdatesOfflineModeCheck.IsChecked == true
+                    ? "Offline mode is enabled — update checks are disabled."
+                    : "Update checks are manual and respect offline mode.";
+            }
         }
     }
 
@@ -703,11 +732,51 @@ public partial class SettingsWindow : Window
         StatusFooterText.Text = "Cleared saved OpenCode server password.";
     }
 
+    private async void OnCheckForUpdatesClicked(object sender, RoutedEventArgs e)
+    {
+        if (_updateService is null)
+        {
+            UpdateStatusText.Text = UpdatesOfflineModeCheck.IsChecked == true
+                ? "Offline mode is enabled — update checks are disabled."
+                : "No remote update feed configured.";
+            return;
+        }
+
+        CheckForUpdatesButton.IsEnabled = false;
+        try
+        {
+            var result = await _updateService.CheckForUpdatesAsync().ConfigureAwait(true);
+            var statusMessage = string.IsNullOrWhiteSpace(result.Message)
+                ? $"Update status: {result.Outcome}"
+                : result.Message;
+            UpdateStatusText.Text = statusMessage;
+            StatusFooterText.Text = statusMessage;
+        }
+        finally
+        {
+            CheckForUpdatesButton.IsEnabled = true;
+        }
+    }
+
     private async void OnSaveLicenseClicked(object sender, RoutedEventArgs e)
     {
         var key = LicenseKeyBox.Password?.Trim();
         if (string.IsNullOrEmpty(key))
         {
+            return;
+        }
+
+        if (_licenseService is not null)
+        {
+            var status = await _licenseService.ActivateLicenseAsync(key).ConfigureAwait(true);
+            if (status.IsValid)
+            {
+                LicenseKeyBox.Password = string.Empty;
+            }
+
+            RefreshPreferencesPanels();
+            LicenseStateText.Text = status.Message;
+            StatusFooterText.Text = status.Message;
             return;
         }
 
@@ -719,6 +788,15 @@ public partial class SettingsWindow : Window
 
     private async void OnClearLicenseClicked(object sender, RoutedEventArgs e)
     {
+        if (_licenseService is not null)
+        {
+            await _licenseService.DeactivateLocalLicenseAsync().ConfigureAwait(true);
+            LicenseKeyBox.Password = string.Empty;
+            RefreshPreferencesPanels();
+            StatusFooterText.Text = _licenseService.GetCachedStatus().Message;
+            return;
+        }
+
         await SavePreferencesFromControlsAsync(clearLicenseKey: true).ConfigureAwait(true);
         LicenseKeyBox.Password = string.Empty;
         RefreshPreferencesPanels();
@@ -844,6 +922,7 @@ public partial class SettingsWindow : Window
         ClockSettingsHost.Content = null;
         InboxSettingsHost.Content = null;
         ClipboardSettingsHost.Content = null;
+        DeveloperSettingsHost.Content = null;
         _appearanceManager.AppearanceChanged -= OnAppearanceChanged;
         _appearanceManager.RenderedAppearanceChanged -= OnAppearanceChanged;
         _presetManager.CatalogChanged -= OnPresetCatalogChanged;

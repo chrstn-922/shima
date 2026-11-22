@@ -2,7 +2,7 @@
 
 Shima is a Windows Dynamic Island desktop companion. It sits flush at the top-center edge of the display, stays collapsed and idle at ~0% CPU, and expands into 8 modular widgets on click, hover, or system events. It is an independent product; Navisle is used only as a public behavioral reference.
 
-**Status: Phases 1–9 complete (T001–T053 done). Phase 10 (T054–T056) is next.** The solution now includes core contracts, SQLite WAL persistence (v1–v7 migrations including `agent_session_logs`), atomic config and `runtime-journal.json` recovery storage, the widget registry, island state and pinning with multi-widget compact pill coexistence, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, Zen audio/display adapters, `Shima.AgentBridge`, and independent opt-in `ClaudeCodeAdapter` and `OpenCodeAdapter` coding-agent adapters, the WPF island shell with collapsed notch status indicator and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, World Clock (`shima.clock`), Now Playing (`shima.music`), Focus Timer & Zen Mode (`shima.focus`), Notes (`shima.notes`), Inbox (`shima.inbox`), Clipboard (`shima.clipboard`), Volume Mixer (`shima.mixer`), and Developer Activity (`shima.developer`). The Release build passes with 0 warnings and 0 errors across 156 unit, persistence, interop, widget, and FlaUI tests. Packaging, signing, and release verification are next.
+**Status: All Phases 1–10 complete (T001–T056 done).** The solution includes core contracts, SQLite WAL persistence (v1–v7 migrations including `agent_session_logs`), atomic config and `runtime-journal.json` recovery storage, the widget registry with lazy expanded view loading, island state and pinning with multi-widget compact pill coexistence, Win32/WinRT/CoreAudio/Magnification overlay, media, mixer, clipboard, notification listener, Zen audio/display adapters, `Shima.AgentBridge`, independent opt-in `ClaudeCodeAdapter` and `OpenCodeAdapter` coding-agent adapters, the WPF island shell with collapsed notch status indicator and text-input focus handoff, the 10-section Settings window, the appearance/preset manager, the Advanced Color Picker, all 8 modular widgets (`Clock`, `Now Playing`, `Focus Timer`, `Notes`, `Inbox`, `Clipboard`, `Volume Mixer`, `Developer Activity`), offline-first `UpdateServiceAdapter` (HTTPS + SHA-256 + ECDSA manifest verification) and DPAPI-cached `LicenseServiceAdapter`, plus Sparse MSIX identity (`build/sparse-msix/AppxManifest.xml`) and dual-RID (`win-x64`, `win-arm64`) build/sign/verification scripts in `build/`. The Release build passes with 0 warnings and 0 errors across 171 unit, persistence, interop, widget, packaging, and FlaUI UI tests, and clean-profile live verification measured `320 ms` startup-to-input-idle, `0%` steady-state idle CPU, `0` TCP sockets, `79.22 MB` max private memory (`-0.1 MB` growth), `159.62 MB` max shared+private WPF/WinRT working set, and `-3` handle delta over a 15-second probe (`0` `System.Drawing` references, `0` hardcoded XAML hex literals).
 
 ## Features
 
@@ -93,6 +93,11 @@ Order and milestones come from [development-roadmap.md](docs/blueprint/developme
 | 7. Notes + Clipboard + Inbox | T038–T044 | M4 | Done |
 | 8. Focus Timer + Zen Mode | T045–T048 | M3 | Done |
 | 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Done |
-| 10. Packaging, signing, release verification | T054–T056 | M6 | Next |
+| 10. Packaging, signing, release verification | T054–T056 | M6 | Done |
 
-Next step: Phase 10 (`T054–T056`) for `UpdateServiceAdapter`, offline-first `LicenseServiceAdapter`, Sparse MSIX `AppxManifest.xml`, Velopack build/sign scripts, and final release verification gates.
+Release packaging & full soak verification (`win-x64` / `win-arm64` + Sparse MSIX; install `vpk` via `dotnet tool install -g vpk` when building Velopack `Setup.exe` delta installers):
+
+```powershell
+.\build\build-release.ps1
+.\build\verify-release.ps1 -SoakDurationSeconds 28800
+```

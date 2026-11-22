@@ -7,7 +7,11 @@ using System.Windows.Media;
 
 namespace Shima.Presentation.Shell;
 
-public sealed record WidgetSlotItem(string WidgetId, string DisplayName, object? Content = null);
+public sealed record WidgetSlotItem(
+    string WidgetId,
+    string DisplayName,
+    object? Content = null,
+    Func<object?>? ContentFactory = null);
 
 public sealed record WidgetDotViewModel(
     string WidgetId,
@@ -22,11 +26,19 @@ public partial class WidgetHost : UserControl
     public const int MaxVisibleDots = 8;
 
     private readonly List<WidgetSlotItem> _slots = [];
+    private readonly Dictionary<string, object?> _resolvedContents = new(StringComparer.Ordinal);
     private string? _selectedWidgetId;
 
     public WidgetHost()
     {
         InitializeComponent();
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible)
+            {
+                RefreshView();
+            }
+        };
     }
 
     public string? SelectedWidgetId => _selectedWidgetId;
@@ -38,6 +50,7 @@ public partial class WidgetHost : UserControl
         ArgumentNullException.ThrowIfNull(slots);
 
         _slots.Clear();
+        _resolvedContents.Clear();
         for (var i = 0; i < Math.Min(slots.Count, MaxVisibleDots); i++)
         {
             _slots.Add(slots[i]);
@@ -127,9 +140,23 @@ public partial class WidgetHost : UserControl
             return;
         }
 
-        if (activeSlot.Content is not null)
+        object? content = activeSlot.Content;
+        if (content is null && activeSlot.ContentFactory is not null)
         {
-            ActiveWidgetContentPresenter.Content = activeSlot.Content;
+            if (_resolvedContents.TryGetValue(activeSlot.WidgetId, out var cached))
+            {
+                content = cached;
+            }
+            else if (IsVisible)
+            {
+                content = activeSlot.ContentFactory();
+                _resolvedContents[activeSlot.WidgetId] = content;
+            }
+        }
+
+        if (content is not null)
+        {
+            ActiveWidgetContentPresenter.Content = content;
             ActiveWidgetContentPresenter.Visibility = Visibility.Visible;
             EmptyStatePanel.Visibility = Visibility.Collapsed;
         }

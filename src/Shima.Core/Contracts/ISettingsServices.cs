@@ -46,6 +46,8 @@ public interface IAppPreferencesService
 
     string? ReadOpenCodeServerPassword();
 
+    string? ReadLicenseStatePayload() => null;
+
     Task ResetToDefaultsAsync(CancellationToken ct = default);
 }
 

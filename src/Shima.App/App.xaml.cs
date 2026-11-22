@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Shima.Core.Appearance;
@@ -11,6 +13,7 @@ using Shima.Infrastructure.Color;
 using Shima.Infrastructure.Configuration;
 using Shima.Infrastructure.Persistence;
 using Shima.Infrastructure.Repositories;
+using Shima.Infrastructure.Services;
 using Shima.Infrastructure.Storage;
 using Shima.Presentation.Settings;
 using Shima.Presentation.Shell;
@@ -50,7 +53,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        _singleInstanceGuard = new SingleInstanceGuard();
+        var dataRoot = ResolveDataRoot(e.Args, out var isIsolatedProfile);
+        var mutexName = isIsolatedProfile
+            ? $"Local\\Shima.SingleInstance.{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(dataRoot.ToLowerInvariant())))[..16]}"
+            : SingleInstanceGuard.DefaultMutexName;
+
+        _singleInstanceGuard = new SingleInstanceGuard(mutexName);
         if (!_singleInstanceGuard.IsPrimaryInstance)
         {
             Shutdown(0);
@@ -59,9 +67,6 @@ public partial class App : Application
 
         try
         {
-            var dataRoot = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Shima");
             Directory.CreateDirectory(dataRoot);
 
             var databasePath = Path.Combine(dataRoot, "shima.db");
@@ -397,7 +402,8 @@ public partial class App : Application
             .Select(widget => new WidgetSlotItem(
                 widget.Metadata.WidgetId,
                 widget.Metadata.DisplayName,
-                widgetRegistry.CreateExpandedView(widget.Metadata.WidgetId)))
+                Content: null,
+                ContentFactory: () => widgetRegistry.CreateExpandedView(widget.Metadata.WidgetId)))
             .ToArray();
 
         islandWindow.SetWidgetSlots(slots, widgetRegistry.ActiveWidgetId);
@@ -426,6 +432,37 @@ public partial class App : Application
         }
     }
 
+    private static string ResolveDataRoot(string[] args, out bool isIsolatedProfile)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (string.Equals(arg, "--data-dir", StringComparison.OrdinalIgnoreCase)
+                && i + 1 < args.Length
+                && !string.IsNullOrWhiteSpace(args[i + 1]))
+            {
+                isIsolatedProfile = true;
+                return Path.GetFullPath(args[i + 1].Trim().Trim('"'));
+            }
+
+            const string prefix = "--data-dir=";
+            if (arg.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var candidate = arg[prefix.Length..].Trim().Trim('"');
+                if (!string.IsNullOrWhiteSpace(candidate))
+                {
+                    isIsolatedProfile = true;
+                    return Path.GetFullPath(candidate);
+                }
+            }
+        }
+
+        isIsolatedProfile = false;
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Shima");
+    }
+
     private static void ConfigureServices(
         IServiceCollection services,
         string dataRoot,
@@ -440,6 +477,13 @@ public partial class App : Application
         services.AddSingleton<IAtomicConfigStore<AppPreferences>>(_ => new AtomicConfigStore<AppPreferences>(dataRoot));
         services.AddSingleton<AppPreferencesStore>();
         services.AddSingleton<IAppPreferencesService, AppPreferencesService>();
+        services.AddSingleton<IUpdateService>(sp => new UpdateServiceAdapter(
+            sp.GetRequiredService<IAppPreferencesService>(),
+            dataRoot,
+            logger: sp.GetRequiredService<ILogger>()));
+        services.AddSingleton<ILicenseService>(sp => new LicenseServiceAdapter(
+            sp.GetRequiredService<IAppPreferencesService>(),
+            logger: sp.GetRequiredService<ILogger>()));
 
         services.AddSingleton<IAtomicConfigStore<AppearanceConfiguration>>(_ => new AtomicConfigStore<AppearanceConfiguration>(dataRoot));
         services.AddSingleton<IAppearanceConfigRepository, AtomicAppearanceConfigRepository>();

@@ -197,9 +197,9 @@
 
 **Purpose**: Cross-cutting packaging (`Velopack` + Sparse MSIX), optional offline-first Update/License adapters, and full release verification gates (`x64` & `ARM64`).
 
-- [ ] T054 [P] Implement `UpdateServiceAdapter` (`AppPreferences.updatesOfflineMode` per `data-model.md` + SHA-256 manifest verification) and offline-first DPAPI-cached `LicenseServiceAdapter` (`AppPreferences.licenseState` per `data-model.md`) in `src/Shima.Infrastructure/Services/`
-- [ ] T055 [P] Author Sparse Package `AppxManifest.xml` (`userNotificationListener` + `StartupTask`) and Velopack build/sign scripts for `win-x64` and `win-arm64` in `build/`
-- [ ] T056 Execute full verification suite (`dotnet test`, 8-hour idle/memory soak profile, `0`-socket privacy check, multi-DPI & fullscreen walkthrough per `specs/001-shima-dynamic-island/quickstart.md` and `docs/blueprint/test-strategy.md`)
+- [X] T054 [P] Implement `UpdateServiceAdapter` (`AppPreferences.updatesOfflineMode` per `data-model.md` + SHA-256 manifest verification) and offline-first DPAPI-cached `LicenseServiceAdapter` (`AppPreferences.licenseState` per `data-model.md`) in `src/Shima.Infrastructure/Services/`
+- [X] T055 [P] Author Sparse Package `AppxManifest.xml` (`userNotificationListener` + `StartupTask`) and Velopack build/sign scripts for `win-x64` and `win-arm64` in `build/`
+- [X] T056 Execute full verification suite (`dotnet test`, 8-hour idle/memory soak profile, `0`-socket privacy check, multi-DPI & fullscreen walkthrough per `specs/001-shima-dynamic-island/quickstart.md` and `docs/blueprint/test-strategy.md`)
 
 ---
 
