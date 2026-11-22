@@ -430,17 +430,21 @@
                                 <TextBox x:Name="InboxRetentionBox" Grid.Column="1" Style="{StaticResource SettingsInputBoxStyle}" LostFocus="OnBehaviorTextLostFocus" />
                             </Grid>
 
-                            <TextBlock Text="Per-app notification exclusions (comma-separated app names or AUMIDs)"
-                                       FontFamily="{DynamicResource ShimaFontFamily}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       Margin="0,0,0,4" />
-                            <TextBox x:Name="NotificationExclusionsBox"
-                                     Style="{StaticResource SettingsInputBoxStyle}"
-                                     IsReadOnly="True"
-                                     Text="Managed by Notification Listener widget (available once Inbox initializes)" />
+                            <StackPanel x:Name="NotificationExclusionsPlaceholderPanel">
+                                <TextBlock Text="Per-app notification exclusions (comma-separated app names or AUMIDs)"
+                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,0,0,4" />
+                                <TextBox x:Name="NotificationExclusionsBox"
+                                         Style="{StaticResource SettingsInputBoxStyle}"
+                                         IsReadOnly="True"
+                                         Text="Managed by Notification Listener widget (available once Inbox initializes)" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
+
+                    <ContentPresenter x:Name="InboxSettingsHost" />
                 </StackPanel>
 
                 <!-- 4. Clipboard -->
@@ -474,6 +478,8 @@
                                     Click="OnResetPreferencesClicked" />
                         </StackPanel>
                     </Border>
+
+                    <ContentPresenter x:Name="ClipboardSettingsHost" />
                 </StackPanel>
 
                 <!-- 5. Focus Timer -->

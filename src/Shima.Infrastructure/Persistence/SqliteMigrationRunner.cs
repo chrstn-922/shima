@@ -39,6 +39,61 @@ public sealed class SqliteMigrationRunner
             );
             CREATE INDEX IF NOT EXISTS idx_world_clock_locations_sort_order
                 ON world_clock_locations (sort_order, location_id);
+            """),
+        new SqliteMigration(
+            3,
+            "notes",
+            """
+            CREATE TABLE IF NOT EXISTS notes (
+                note_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL CHECK (length(title) <= 120),
+                content_text TEXT NOT NULL CHECK (length(content_text) <= 200000),
+                is_pinned INTEGER NOT NULL DEFAULT 0 CHECK (is_pinned IN (0, 1)),
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_notes_updated_at
+                ON notes (is_pinned DESC, updated_at_utc DESC, note_id ASC);
+            """),
+        new SqliteMigration(
+            4,
+            "clipboard_entries",
+            """
+            CREATE TABLE IF NOT EXISTS clipboard_entries (
+                entry_id TEXT PRIMARY KEY,
+                content_type TEXT NOT NULL CHECK (content_type IN ('Text', 'Image')),
+                text_content TEXT NULL CHECK (text_content IS NULL OR length(text_content) <= 1048576),
+                image_rel_path TEXT NULL,
+                content_hash TEXT NOT NULL,
+                source_app_name TEXT NULL CHECK (source_app_name IS NULL OR length(source_app_name) <= 128),
+                byte_size INTEGER NOT NULL CHECK (byte_size >= 0),
+                is_pinned INTEGER NOT NULL DEFAULT 0 CHECK (is_pinned IN (0, 1)),
+                copied_at_utc TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_clipboard_copied_at
+                ON clipboard_entries (copied_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_clipboard_pinned_copied_at
+                ON clipboard_entries (is_pinned DESC, copied_at_utc DESC);
+            """),
+        new SqliteMigration(
+            5,
+            "inbox_notifications",
+            """
+            CREATE TABLE IF NOT EXISTS inbox_notifications (
+                notification_id TEXT PRIMARY KEY,
+                os_toast_id INTEGER NULL,
+                app_id TEXT NOT NULL,
+                app_name TEXT NOT NULL CHECK (length(app_name) BETWEEN 1 AND 128),
+                app_icon_rel_path TEXT NULL,
+                title TEXT NOT NULL CHECK (length(title) <= 512),
+                body_text TEXT NOT NULL CHECK (length(body_text) <= 4096),
+                is_dismissed INTEGER NOT NULL DEFAULT 0 CHECK (is_dismissed IN (0, 1)),
+                received_at_utc TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_inbox_received_at
+                ON inbox_notifications (received_at_utc DESC);
+            CREATE INDEX IF NOT EXISTS idx_inbox_os_toast_id
+                ON inbox_notifications (os_toast_id);
             """)
     ];
 

@@ -1,0 +1,293 @@
+<UserControl x:Class="Shima.Widgets.Notes.Views.NotesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="{Binding AccessibleStatus}"
+             AutomationProperties.AutomationId="NotesWidgetView">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="NoteActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfacePillButton}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NoteCopyButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource NoteActionButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCopiedFeedbackActive}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="NoteRowButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RowBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowBorder" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="RowBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="RowBorder" Property="Background" Value="{DynamicResource SurfaceElevated}" />
+                                <Setter TargetName="RowBorder" Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NotesInputBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource SurfaceElevated}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="11.5" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="126" />
+            <ColumnDefinition Width="10" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left Pane: Search + New Note + List -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="6" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="NotesSearchBox"
+                         Grid.Column="0"
+                         Style="{StaticResource NotesInputBoxStyle}"
+                         Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search notes"
+                         GotKeyboardFocus="OnInputGotKeyboardFocus"
+                         LostKeyboardFocus="OnInputLostKeyboardFocus"
+                         AutomationProperties.Name="Search notes"
+                         AutomationProperties.AutomationId="NotesSearchBox" />
+
+                <Button Grid.Column="2"
+                        Style="{StaticResource NoteActionButtonStyle}"
+                        Content="New"
+                        Click="OnNewNoteClicked"
+                        ToolTip="Create new note"
+                        AutomationProperties.Name="Create new note"
+                        AutomationProperties.AutomationId="NotesNewButton" />
+            </Grid>
+
+            <Grid Grid.Row="2">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Visibility="{Binding HasNotes, Converter={StaticResource BoolToVis}}">
+                    <ItemsControl ItemsSource="{Binding Notes}"
+                                  AutomationProperties.AutomationId="NotesList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource NoteRowButtonStyle}"
+                                        Tag="{Binding NoteId}"
+                                        Click="OnNoteRowClicked"
+                                        AutomationProperties.Name="{Binding SelectActionLabel}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                       FontSize="11.5"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding UpdatedLabel}"
+                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                       FontSize="10"
+                                                       Foreground="{DynamicResource TextMuted}" />
+                                        </StackPanel>
+
+                                        <Ellipse Grid.Column="1"
+                                                 Width="5"
+                                                 Height="5"
+                                                 Margin="4,0,0,0"
+                                                 VerticalAlignment="Center"
+                                                 Fill="{DynamicResource AccentBrush}"
+                                                 Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock Text="No notes yet"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextMuted}"
+                           Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}"
+                           AutomationProperties.AutomationId="NotesEmptyText" />
+            </Grid>
+        </Grid>
+
+        <!-- Right Pane: Toolbar + Scratchpad Editor -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="6" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="4" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Compact right-aligned action row: all three buttons always fully visible -->
+            <StackPanel Grid.Row="0"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Style="{StaticResource NoteActionButtonStyle}"
+                        Content="Pin"
+                        Margin="0,0,3,0"
+                        IsEnabled="{Binding HasActiveNote}"
+                        Click="OnPinActiveClicked"
+                        AutomationProperties.Name="{Binding PinActiveActionLabel}"
+                        AutomationProperties.AutomationId="NotesPinButton" />
+                <Button Style="{StaticResource NoteCopyButtonStyle}"
+                        Content="{Binding CopyButtonLabel}"
+                        Margin="0,0,3,0"
+                        IsEnabled="{Binding HasActiveNote}"
+                        Click="OnCopyActiveClicked"
+                        AutomationProperties.Name="Copy note contents"
+                        AutomationProperties.AutomationId="NotesCopyButton" />
+                <Button Style="{StaticResource NoteActionButtonStyle}"
+                        Content="Delete"
+                        IsEnabled="{Binding HasActiveNote}"
+                        Click="OnDeleteActiveClicked"
+                        AutomationProperties.Name="Delete selected note"
+                        AutomationProperties.AutomationId="NotesDeleteButton" />
+            </StackPanel>
+
+            <!-- Compact footer: save status + word/char count below the editor -->
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding SaveStatusLabel}"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="10.5"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.AutomationId="NotesSaveStatusText">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCopiedFeedbackActive}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsCopyError}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource SettingsDangerText}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding WordCountLabel}"
+                           Margin="8,0,0,0"
+                           HorizontalAlignment="Right"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="10.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Visibility="{Binding ShowWordCount, Converter={StaticResource BoolToVis}}" />
+            </Grid>
+
+            <TextBox x:Name="NoteEditorBox"
+                     Grid.Row="2"
+                     Style="{StaticResource NotesInputBoxStyle}"
+                     Text="{Binding EditorContent, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled"
+                     FontSize="12"
+                     GotKeyboardFocus="OnInputGotKeyboardFocus"
+                     LostKeyboardFocus="OnInputLostKeyboardFocus"
+                     AutomationProperties.Name="Scratchpad note editor"
+                     AutomationProperties.AutomationId="NotesEditorBox" />
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Shima.Presentation.Shell;
 
@@ -168,7 +170,7 @@ public partial class WidgetHost : UserControl
 
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (_slots.Count <= 1 || e.Delta == 0)
+        if (_slots.Count <= 1 || e.Delta == 0 || ShouldSuppressWheelWidgetSwitch(e.OriginalSource))
         {
             return;
         }
@@ -179,6 +181,11 @@ public partial class WidgetHost : UserControl
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (IsTextInputFocused(e.OriginalSource))
+        {
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Right:
@@ -195,5 +202,49 @@ public partial class WidgetHost : UserControl
                 e.Handled = true;
                 break;
         }
+    }
+
+    private static bool IsTextInputFocused(object? originalSource)
+    {
+        if (Keyboard.FocusedElement is TextBoxBase)
+        {
+            return true;
+        }
+
+        for (var current = originalSource as DependencyObject; current is not null;)
+        {
+            if (current is TextBoxBase)
+            {
+                return true;
+            }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    private bool ShouldSuppressWheelWidgetSwitch(object? originalSource)
+    {
+        for (var current = originalSource as DependencyObject; current is not null;)
+        {
+            if (ReferenceEquals(current, PagerItemsControl))
+            {
+                return false;
+            }
+
+            if (current is ScrollViewer { ScrollableHeight: > 0 })
+            {
+                return true;
+            }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
     }
 }

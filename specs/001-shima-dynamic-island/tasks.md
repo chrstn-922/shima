@@ -133,16 +133,16 @@
 
 ### Tests for User Story 4
 
-- [ ] T038 [P] [US4] Write tests for `NoteRepository` (200KB cap), `ClipboardRepository` (`content_hash` dedup, retention pruning), and `InboxRepository` in `tests/Shima.Infrastructure.Tests/ProductivityRepositoriesTests.cs`
-- [ ] T039 [P] [US4] Write interop & widget tests for clipboard exclusion format filtering, self-copy suppression loop guard, DND popup suppression, and `IdentityUnavailable` Inbox fallback in `tests/Shima.Widgets.Tests/ProductivityWidgetsTests.cs`
+- [X] T038 [P] [US4] Write tests for `NoteRepository` (200KB cap), `ClipboardRepository` (`content_hash` dedup, retention pruning), and `InboxRepository` in `tests/Shima.Infrastructure.Tests/ProductivityRepositoriesTests.cs`
+- [X] T039 [P] [US4] Write interop & widget tests for clipboard exclusion format filtering, self-copy suppression loop guard, DND popup suppression, and `IdentityUnavailable` Inbox fallback in `tests/Shima.Widgets.Tests/ProductivityWidgetsTests.cs`
 
 ### Implementation for User Story 4
 
-- [ ] T040 [P] [US4] Implement `NoteRepository` (`NOTE_ENTRY.note_id`, `NOTE_ENTRY.title`, `NOTE_ENTRY.content_text`, `NOTE_ENTRY.is_pinned`, `NOTE_ENTRY.created_at_utc`, `NOTE_ENTRY.updated_at_utc` per `data-model.md`), `ClipboardRepository` (`CLIPBOARD_ENTRY.entry_id`, `CLIPBOARD_ENTRY.content_type`, `CLIPBOARD_ENTRY.text_content`, `CLIPBOARD_ENTRY.content_hash`, `CLIPBOARD_ENTRY.source_app_name`, `CLIPBOARD_ENTRY.byte_size`, `CLIPBOARD_ENTRY.is_pinned`, `CLIPBOARD_ENTRY.copied_at_utc` per `data-model.md`), and `InboxRepository` (`INBOX_NOTIFICATION.notification_id`, `INBOX_NOTIFICATION.os_toast_id`, `INBOX_NOTIFICATION.app_id`, `INBOX_NOTIFICATION.app_name`, `INBOX_NOTIFICATION.title`, `INBOX_NOTIFICATION.body_text`, `INBOX_NOTIFICATION.is_dismissed`, `INBOX_NOTIFICATION.received_at_utc` per `data-model.md`) in `src/Shima.Infrastructure/Repositories/`
-- [ ] T041 [P] [US4] Implement `ClipboardMonitorAdapter` (`AddClipboardFormatListener`, exclusion format checks, 3-retry `OpenClipboard`) and `NotificationListenerAdapter` (`UserNotificationListener`, `RemoveNotification`, `IdentityUnavailable` detection) in `src/Shima.WindowsInterop/`
-- [ ] T042 [US4] Implement `NotesWidgetModule` (`shima.notes`, 500ms debounced save, focus-safe island lock, search) in `src/Shima.Widgets/Shima.Widgets.Notes/`
-- [ ] T043 [US4] Implement `ClipboardWidgetModule` (`shima.clipboard`, text/image preview, recopy suppression, pin/pause/clear) in `src/Shima.Widgets/Shima.Widgets.Clipboard/`
-- [ ] T044 [US4] Implement `InboxWidgetModule` (`shima.inbox`, per-app grouping, `AppPreferences.syncInboxDismissalWithActionCenter` bidirectional dismissal per `data-model.md`, non-native popup notice & access-guidance view) in `src/Shima.Widgets/Shima.Widgets.Inbox/`
+- [X] T040 [P] [US4] Implement `NoteRepository` (`NOTE_ENTRY.note_id`, `NOTE_ENTRY.title`, `NOTE_ENTRY.content_text`, `NOTE_ENTRY.is_pinned`, `NOTE_ENTRY.created_at_utc`, `NOTE_ENTRY.updated_at_utc` per `data-model.md`), `ClipboardRepository` (`CLIPBOARD_ENTRY.entry_id`, `CLIPBOARD_ENTRY.content_type`, `CLIPBOARD_ENTRY.text_content`, `CLIPBOARD_ENTRY.content_hash`, `CLIPBOARD_ENTRY.source_app_name`, `CLIPBOARD_ENTRY.byte_size`, `CLIPBOARD_ENTRY.is_pinned`, `CLIPBOARD_ENTRY.copied_at_utc` per `data-model.md`), and `InboxRepository` (`INBOX_NOTIFICATION.notification_id`, `INBOX_NOTIFICATION.os_toast_id`, `INBOX_NOTIFICATION.app_id`, `INBOX_NOTIFICATION.app_name`, `INBOX_NOTIFICATION.title`, `INBOX_NOTIFICATION.body_text`, `INBOX_NOTIFICATION.is_dismissed`, `INBOX_NOTIFICATION.received_at_utc` per `data-model.md`) in `src/Shima.Infrastructure/Repositories/`
+- [X] T041 [P] [US4] Implement `ClipboardMonitorAdapter` (`AddClipboardFormatListener`, exclusion format checks, 3-retry `OpenClipboard`) and `NotificationListenerAdapter` (`UserNotificationListener`, `RemoveNotification`, `IdentityUnavailable` detection) in `src/Shima.WindowsInterop/`
+- [X] T042 [US4] Implement `NotesWidgetModule` (`shima.notes`, 500ms debounced save, focus-safe island lock, search) in `src/Shima.Widgets/Shima.Widgets.Notes/`
+- [X] T043 [US4] Implement `ClipboardWidgetModule` (`shima.clipboard`, text/image preview, recopy suppression, pin/pause/clear) in `src/Shima.Widgets/Shima.Widgets.Clipboard/`
+- [X] T044 [US4] Implement `InboxWidgetModule` (`shima.inbox`, per-app grouping, `AppPreferences.syncInboxDismissalWithActionCenter` bidirectional dismissal per `data-model.md`, non-native popup notice & access-guidance view) in `src/Shima.Widgets/Shima.Widgets.Inbox/`
 
 ---
 

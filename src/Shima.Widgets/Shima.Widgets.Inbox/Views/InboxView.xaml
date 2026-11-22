@@ -1,0 +1,266 @@
+<UserControl x:Class="Shima.Widgets.Inbox.Views.InboxView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="{Binding AccessibleStatus}"
+             AutomationProperties.AutomationId="InboxWidgetView">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="InboxActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfacePillButton}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" LastChildFill="False">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Inbox"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}" />
+                <TextBlock Text="{Binding TotalCountLabel}"
+                           Margin="8,0,0,0"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextMuted}" />
+            </StackPanel>
+
+            <Button DockPanel.Dock="Right"
+                    Style="{StaticResource InboxActionButtonStyle}"
+                    Content="Clear all"
+                    Visibility="{Binding HasNotifications, Converter={StaticResource BoolToVis}}"
+                    Click="OnClearAllClicked"
+                    AutomationProperties.Name="Clear all notifications"
+                    AutomationProperties.AutomationId="InboxClearAllButton" />
+        </DockPanel>
+
+        <!-- Body -->
+        <Grid Grid.Row="2">
+            <!-- Sparse Package Identity / Permission Guidance Card -->
+            <Border Visibility="{Binding ShowAccessGuidanceCard, Converter={StaticResource BoolToVis}}"
+                    Background="{DynamicResource WarningBannerSurface}"
+                    BorderBrush="{DynamicResource WarningBannerBorder}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="12"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="InboxAccessGuidanceCard">
+                <StackPanel>
+                    <TextBlock Text="{Binding AccessGuidanceTitle}"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource WarningBannerText}" />
+                    <TextBlock Text="{Binding AccessGuidanceMessage}"
+                               Margin="0,4,0,8"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextMuted}"
+                               TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource InboxActionButtonStyle}"
+                                Content="Open Windows Settings"
+                                Margin="0,0,6,0"
+                                Visibility="{Binding ShowOpenWindowsSettingsButton, Converter={StaticResource BoolToVis}}"
+                                Click="OnOpenSettingsClicked"
+                                AutomationProperties.Name="Open Windows Notification Settings"
+                                AutomationProperties.AutomationId="InboxOpenWindowsSettingsButton" />
+                        <Button Style="{StaticResource InboxActionButtonStyle}"
+                                Content="Grant access"
+                                Margin="0,0,6,0"
+                                Visibility="{Binding ShowRequestAccessButton, Converter={StaticResource BoolToVis}}"
+                                Click="OnRequestAccessClicked"
+                                AutomationProperties.Name="Grant notification access"
+                                AutomationProperties.AutomationId="InboxGrantAccessButton" />
+                        <Button Style="{StaticResource InboxActionButtonStyle}"
+                                Content="Retry"
+                                Click="OnRetryClicked"
+                                AutomationProperties.Name="Retry notification access check"
+                                AutomationProperties.AutomationId="InboxRetryButton" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Grouped Notifications -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding HasNotifications, Converter={StaticResource BoolToVis}}">
+                <ItemsControl ItemsSource="{Binding AppGroups}"
+                              AutomationProperties.AutomationId="InboxAppGroupsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource SurfaceElevated}"
+                                    BorderBrush="{DynamicResource BorderHairline}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="8,6"
+                                    Margin="0,0,0,6">
+                                <StackPanel>
+                                    <DockPanel LastChildFill="False">
+                                        <Button DockPanel.Dock="Left"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Padding="0"
+                                                Cursor="Hand"
+                                                Tag="{Binding AppId}"
+                                                Click="OnToggleGroupClicked"
+                                                AutomationProperties.Name="{Binding ExpandActionLabel}">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Width="20"
+                                                        Height="20"
+                                                        CornerRadius="5"
+                                                        Margin="0,0,8,0"
+                                                        Background="{DynamicResource SurfacePillButton}"
+                                                        ClipToBounds="True">
+                                                    <Grid>
+                                                        <TextBlock Text="{Binding AppInitial}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                                                   FontSize="10.5"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextPrimary}" />
+                                                        <Image Source="{Binding IconBitmap}"
+                                                               Stretch="UniformToFill"
+                                                               Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}" />
+                                                    </Grid>
+                                                </Border>
+                                                <TextBlock Text="{Binding AppName}"
+                                                           VerticalAlignment="Center"
+                                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimary}" />
+                                                <TextBlock Text="{Binding CountLabel}"
+                                                           Margin="8,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                                           FontSize="10.5"
+                                                           Foreground="{DynamicResource TextMuted}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button DockPanel.Dock="Right"
+                                                Style="{StaticResource InboxActionButtonStyle}"
+                                                Content="Clear"
+                                                Tag="{Binding AppId}"
+                                                Click="OnClearGroupClicked"
+                                                AutomationProperties.Name="{Binding ClearGroupActionLabel}" />
+                                    </DockPanel>
+
+                                    <ItemsControl ItemsSource="{Binding Items}"
+                                                  Margin="0,6,0,0"
+                                                  Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2,0,3"
+                                                      AutomationProperties.Name="{Binding AccessibleState}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="6" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0">
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left"
+                                                                       Text="{Binding Title}"
+                                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                                       FontSize="11.5"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource TextPrimary}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock DockPanel.Dock="Right"
+                                                                       Text="{Binding TimeLabel}"
+                                                                       Margin="6,0,0,0"
+                                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                                       FontSize="10"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                        </DockPanel>
+                                                        <TextBlock Text="{Binding BodyText}"
+                                                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource TextMuted}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+
+                                                    <Button Grid.Column="2"
+                                                            Style="{StaticResource InboxActionButtonStyle}"
+                                                            Content="Dismiss"
+                                                            Tag="{Binding NotificationId}"
+                                                            VerticalAlignment="Center"
+                                                            Click="OnDismissItemClicked"
+                                                            AutomationProperties.Name="{Binding DismissActionLabel}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Clean Empty State when Allowed & Zero Alerts -->
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}"
+                        AutomationProperties.AutomationId="InboxEmptyStatePanel">
+                <TextBlock Text="No unread notifications"
+                           HorizontalAlignment="Center"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="12.5"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}" />
+                <TextBlock Text="{Binding NonNativeNoticeText}"
+                           Margin="16,4,16,0"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="10.5"
+                           Foreground="{DynamicResource TextMuted}" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

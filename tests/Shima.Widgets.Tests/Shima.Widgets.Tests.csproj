@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Shima.Core\Shima.Core.csproj" />
+    <ProjectReference Include="..\..\src\Shima.WindowsInterop\Shima.WindowsInterop.csproj" />
     <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.Clock\Shima.Widgets.Clock.csproj" />
     <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.NowPlaying\Shima.Widgets.NowPlaying.csproj" />
     <ProjectReference Include="..\..\src\Shima.Widgets\Shima.Widgets.FocusTimer\Shima.Widgets.FocusTimer.csproj" />

@@ -82,6 +82,8 @@ public partial class SettingsWindow : Window
 
         await RefreshWidgetsPanelAsync().ConfigureAwait(true);
         RefreshClockSettingsHost();
+        RefreshNotificationSettingsHost();
+        RefreshClipboardSettingsHost();
     }
 
     private void RefreshClockSettingsHost()
@@ -91,6 +93,21 @@ public partial class SettingsWindow : Window
         ClockSettingsPlaceholderCard.Visibility = clockSettingsView is null
             ? Visibility.Visible
             : Visibility.Collapsed;
+    }
+
+    private void RefreshNotificationSettingsHost()
+    {
+        var inboxSettingsView = _widgetCoordinator?.CreateSettingsView("shima.inbox");
+        InboxSettingsHost.Content = inboxSettingsView;
+        NotificationExclusionsPlaceholderPanel.Visibility = inboxSettingsView is null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void RefreshClipboardSettingsHost()
+    {
+        var clipboardSettingsView = _widgetCoordinator?.CreateSettingsView("shima.clipboard");
+        ClipboardSettingsHost.Content = clipboardSettingsView;
     }
 
     public void SelectSection(string sectionTag)
@@ -140,6 +157,14 @@ public partial class SettingsWindow : Window
         else if (string.Equals(tag, "Clock", StringComparison.Ordinal))
         {
             RefreshClockSettingsHost();
+        }
+        else if (string.Equals(tag, "Notifications", StringComparison.Ordinal))
+        {
+            RefreshNotificationSettingsHost();
+        }
+        else if (string.Equals(tag, "Clipboard", StringComparison.Ordinal))
+        {
+            RefreshClipboardSettingsHost();
         }
         else if (string.Equals(tag, "General", StringComparison.Ordinal))
         {
@@ -792,6 +817,8 @@ public partial class SettingsWindow : Window
     private void OnSettingsClosed(object? sender, EventArgs e)
     {
         ClockSettingsHost.Content = null;
+        InboxSettingsHost.Content = null;
+        ClipboardSettingsHost.Content = null;
         _appearanceManager.AppearanceChanged -= OnAppearanceChanged;
         _appearanceManager.RenderedAppearanceChanged -= OnAppearanceChanged;
         _presetManager.CatalogChanged -= OnPresetCatalogChanged;

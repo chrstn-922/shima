@@ -1,0 +1,144 @@
+<UserControl x:Class="Shima.Widgets.Inbox.Views.InboxSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Notification Inbox widget settings">
+    <UserControl.Resources>
+        <Style x:Key="InboxSettingsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsCard}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="InboxSettingsButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="InboxSettingsInputBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Border Style="{StaticResource InboxSettingsCardStyle}">
+            <StackPanel>
+                <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                    <TextBlock DockPanel.Dock="Left"
+                               Text="Windows Notification Listener"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
+
+                    <Button DockPanel.Dock="Right"
+                            Content="Reset defaults"
+                            Style="{StaticResource InboxSettingsButtonStyle}"
+                            Click="OnResetDefaultsClicked"
+                            AutomationProperties.AutomationId="InboxResetDefaultsButton" />
+                </DockPanel>
+
+                <TextBlock Text="{Binding AccessStatusLabel}"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextPrimary}"
+                           Margin="0,0,0,8" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                    <Button Content="Open Windows Settings"
+                            Style="{StaticResource InboxSettingsButtonStyle}"
+                            Margin="0,0,6,0"
+                            Click="OnOpenWindowsSettingsClicked" />
+                    <Button Content="Request access"
+                            Style="{StaticResource InboxSettingsButtonStyle}"
+                            Click="OnRequestAccessClicked" />
+                </StackPanel>
+
+                <CheckBox x:Name="MaskBodyCheck"
+                          Content="Mask notification body text in Dynamic Island popup previews"
+                          IsChecked="{Binding MaskNotificationBodyInPopups, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Margin="0,0,0,10"
+                          Checked="OnMaskBodyToggled"
+                          Unchecked="OnMaskBodyToggled"
+                          AutomationProperties.AutomationId="InboxMaskBodyCheck" />
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="90" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Popup preview duration (2-15 seconds)"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextMuted}" />
+                    <TextBox x:Name="PreviewDurationBox"
+                             Grid.Column="1"
+                             Style="{StaticResource InboxSettingsInputBoxStyle}"
+                             LostFocus="OnPreviewDurationLostFocus" />
+                </Grid>
+
+                <TextBlock Text="Per-app notification exclusions (comma-separated app names or AppUserModelIDs)"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextMuted}"
+                           Margin="0,0,0,4" />
+                <DockPanel LastChildFill="True" Margin="0,0,0,10">
+                    <Button DockPanel.Dock="Right"
+                            Content="Save exclusions"
+                            Style="{StaticResource InboxSettingsButtonStyle}"
+                            Margin="8,0,0,0"
+                            Click="OnSaveExclusionsClicked" />
+                    <TextBox x:Name="ExcludedAppsBox"
+                             Style="{StaticResource InboxSettingsInputBoxStyle}"
+                             AutomationProperties.AutomationId="InboxExcludedAppsBox" />
+                </DockPanel>
+
+                <TextBlock FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           TextWrapping="Wrap"
+                           Text="{Binding NonNativeNoticeText}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

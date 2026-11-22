@@ -120,20 +120,22 @@ public sealed class SqliteMigrationRunnerTests : TempDirectoryTest
             }
         }
 
-        appliedVersions.Should().Equal(1, 2);
+        appliedVersions.Should().Equal(1, 2, 3, 4, 5);
 
-        await using (var widgetConfigs = connection.CreateCommand())
+        foreach (var expectedTable in new[]
+                 {
+                     "widget_configs",
+                     "world_clock_locations",
+                     "notes",
+                     "clipboard_entries",
+                     "inbox_notifications"
+                 })
         {
-            widgetConfigs.CommandText =
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'widget_configs';";
-            (await widgetConfigs.ExecuteScalarAsync()).Should().Be("widget_configs");
-        }
-
-        await using (var worldClocks = connection.CreateCommand())
-        {
-            worldClocks.CommandText =
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'world_clock_locations';";
-            (await worldClocks.ExecuteScalarAsync()).Should().Be("world_clock_locations");
+            await using var checkTable = connection.CreateCommand();
+            checkTable.CommandText =
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = $name;";
+            checkTable.Parameters.AddWithValue("$name", expectedTable);
+            (await checkTable.ExecuteScalarAsync()).Should().Be(expectedTable);
         }
     }
 

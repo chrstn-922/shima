@@ -45,7 +45,7 @@ public sealed class SystemTrayService : IDisposable
             throw new InvalidOperationException("IslandWindow handle must be initialized before attaching tray icon.");
         }
 
-        islandWindow.SetWindowMessageHook(_trayHost.HandleWindowMessage);
+        islandWindow.AddWindowMessageHook(_trayHost.HandleWindowMessage);
         _trayHost.Attach(islandWindow.WindowHandle, "Shima Dynamic Island");
     }
 
@@ -57,7 +57,7 @@ public sealed class SystemTrayService : IDisposable
         }
 
         _disposed = true;
-        _islandWindow?.SetWindowMessageHook(null);
+        _islandWindow?.RemoveWindowMessageHook(_trayHost.HandleWindowMessage);
         _trayHost.PrimaryActionInvoked -= OnPrimaryActionInvoked;
         _trayHost.MenuItemClicked -= OnMenuItemClicked;
         _trayHost.Dispose();

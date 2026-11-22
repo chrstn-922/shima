@@ -1,0 +1,102 @@
+<UserControl x:Class="Shima.Widgets.Clipboard.Views.ClipboardSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="Clipboard widget settings">
+    <UserControl.Resources>
+        <Style x:Key="ClipboardSettingsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsCard}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="ClipboardSettingsButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfaceSettingsInput}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderSubtle}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SettingsNavSelected}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Border Style="{StaticResource ClipboardSettingsCardStyle}">
+            <StackPanel>
+                <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                    <TextBlock DockPanel.Dock="Left"
+                               Text="Clipboard history controls"
+                               VerticalAlignment="Center"
+                               FontFamily="{DynamicResource ShimaFontFamily}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}" />
+
+                    <Button DockPanel.Dock="Right"
+                            Content="Reset defaults"
+                            Style="{StaticResource ClipboardSettingsButtonStyle}"
+                            Click="OnResetDefaultsClicked"
+                            AutomationProperties.AutomationId="ClipboardResetDefaultsButton" />
+                </DockPanel>
+
+                <CheckBox x:Name="CaptureImagesCheck"
+                          Content="Capture copied bitmap and PNG images (up to 10 MB)"
+                          IsChecked="{Binding CaptureImages, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Margin="0,0,0,8"
+                          Checked="OnCaptureImagesToggled"
+                          Unchecked="OnCaptureImagesToggled"
+                          AutomationProperties.AutomationId="ClipboardCaptureImagesCheck" />
+
+                <CheckBox x:Name="PauseClipboardCheck"
+                          Content="Pause clipboard monitoring"
+                          IsChecked="{Binding IsPaused, Mode=OneWay}"
+                          Foreground="{DynamicResource TextPrimary}"
+                          Margin="0,0,0,10"
+                          Checked="OnPauseToggled"
+                          Unchecked="OnPauseToggled"
+                          AutomationProperties.AutomationId="ClipboardPauseCheck" />
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button Content="Clear unpinned history now"
+                            Style="{StaticResource ClipboardSettingsButtonStyle}"
+                            Click="OnClearUnpinnedClicked"
+                            AutomationProperties.AutomationId="ClipboardSettingsClearUnpinnedButton" />
+                </StackPanel>
+
+                <TextBlock FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource TextMuted}"
+                           TextWrapping="Wrap"
+                           Text="Password-manager privacy active: items carrying ExcludeClipboardContentFromMonitorProcessing, CanIncludeInClipboardHistory = 0, or Clipboard Viewer Ignore are automatically excluded." />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

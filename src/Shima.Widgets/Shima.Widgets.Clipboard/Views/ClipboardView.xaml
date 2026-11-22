@@ -1,0 +1,323 @@
+<UserControl x:Class="Shima.Widgets.Clipboard.Views.ClipboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.Name="{Binding AccessibleStatus}"
+             AutomationProperties.AutomationId="ClipboardWidgetView">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="ClipboardHeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource SurfacePillButton}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SurfacePillButtonHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                                <Setter TargetName="BtnBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ClipboardRowActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ClipboardHeaderButtonStyle}">
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="ClipboardRowCopyButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ClipboardRowActionButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCopiedFeedbackActive}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ClipboardRowPinButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ClipboardRowActionButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ClipboardRecopyButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RowBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowBorder" Property="Background" Value="{DynamicResource SurfaceElevated}" />
+                                <Setter TargetName="RowBorder" Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="RowBorder" Property="BorderBrush" Value="{DynamicResource FocusRingBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ClipboardSearchBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource SurfaceElevated}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontFamily" Value="{DynamicResource ShimaFontFamily}" />
+            <Setter Property="FontSize" Value="11.5" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Search + Pause + Clear unpinned -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="ClipboardSearchBox"
+                     Grid.Column="0"
+                     Style="{StaticResource ClipboardSearchBoxStyle}"
+                     Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Search clipboard history"
+                     GotKeyboardFocus="OnSearchGotKeyboardFocus"
+                     LostKeyboardFocus="OnSearchLostKeyboardFocus"
+                     AutomationProperties.Name="Search clipboard history"
+                     AutomationProperties.AutomationId="ClipboardSearchBox" />
+
+            <Button Grid.Column="2"
+                    Style="{StaticResource ClipboardHeaderButtonStyle}"
+                    Content="{Binding PauseToggleLabel}"
+                    Click="OnPauseToggleClicked"
+                    AutomationProperties.Name="{Binding PauseActionLabel}"
+                    AutomationProperties.AutomationId="ClipboardPauseButton" />
+
+            <Button Grid.Column="4"
+                    Style="{StaticResource ClipboardHeaderButtonStyle}"
+                    Content="Clear unpinned"
+                    Click="OnClearUnpinnedClicked"
+                    AutomationProperties.Name="Clear unpinned clipboard history"
+                    AutomationProperties.AutomationId="ClipboardClearUnpinnedButton" />
+        </Grid>
+
+        <!-- Compact inline confirmation / status pill -->
+        <Border Grid.Row="1"
+                Margin="0,6,0,0"
+                Padding="8,3"
+                CornerRadius="6"
+                BorderThickness="1"
+                HorizontalAlignment="Left"
+                Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}"
+                AutomationProperties.AutomationId="ClipboardStatusPill">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="{DynamicResource SurfaceElevated}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource BorderHairline}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCopySuccessFeedbackActive}" Value="True">
+                            <Setter Property="BorderBrush" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource SettingsDangerSurface}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource SettingsDangerBorder}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding StatusMessage}"
+                       FontFamily="{DynamicResource ShimaFontFamily}"
+                       FontSize="10.5"
+                       FontWeight="SemiBold">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCopySuccessFeedbackActive}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource SettingsDangerText}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Border>
+
+        <!-- History List / Empty State -->
+        <Grid Grid.Row="3">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding HasEntries, Converter={StaticResource BoolToVis}}">
+                <ItemsControl ItemsSource="{Binding Entries}"
+                              AutomationProperties.AutomationId="ClipboardEntriesList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,1,0,3"
+                                  AutomationProperties.Name="{Binding RowAccessibleName}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="3" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="3" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="3" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Column="0"
+                                        Style="{StaticResource ClipboardRecopyButtonStyle}"
+                                        Tag="{Binding EntryId}"
+                                        Click="OnRecopyClicked"
+                                        AutomationProperties.Name="{Binding RecopyActionLabel}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0"
+                                                Width="32"
+                                                Height="32"
+                                                CornerRadius="6"
+                                                Margin="0,0,8,0"
+                                                Background="{DynamicResource SurfacePillButton}"
+                                                BorderBrush="{DynamicResource BorderHairline}"
+                                                BorderThickness="1"
+                                                ClipToBounds="True"
+                                                Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVis}}">
+                                            <Image Source="{Binding ThumbnailBitmap}"
+                                                   Stretch="UniformToFill" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0"
+                                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                           FontSize="10"
+                                                           Text="&#xE718;"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           Margin="0,0,5,0"
+                                                           VerticalAlignment="Center"
+                                                           ToolTip="Pinned"
+                                                           Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}"
+                                                           AutomationProperties.Name="{Binding PinStateLabel}"
+                                                           AutomationProperties.AutomationId="ClipboardPinnedIndicator" />
+
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding PreviewText}"
+                                                           FontFamily="{DynamicResource ShimaFontFamily}"
+                                                           FontSize="11.5"
+                                                           Foreground="{DynamicResource TextPrimary}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding MetaLabel}"
+                                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                                       FontSize="10"
+                                                       Foreground="{DynamicResource TextMuted}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+
+                                <Button Grid.Column="2"
+                                        Style="{StaticResource ClipboardRowCopyButtonStyle}"
+                                        Content="{Binding CopyButtonLabel}"
+                                        Tag="{Binding EntryId}"
+                                        Click="OnRecopyClicked"
+                                        AutomationProperties.Name="{Binding RecopyActionLabel}" />
+
+                                <Button Grid.Column="4"
+                                        Style="{StaticResource ClipboardRowPinButtonStyle}"
+                                        Content="{Binding PinButtonLabel}"
+                                        Tag="{Binding EntryId}"
+                                        Click="OnPinEntryClicked"
+                                        AutomationProperties.Name="{Binding PinActionLabel}"
+                                        AutomationProperties.AutomationId="ClipboardPinButton" />
+
+                                <Button Grid.Column="6"
+                                        Style="{StaticResource ClipboardRowActionButtonStyle}"
+                                        Content="Remove"
+                                        Tag="{Binding EntryId}"
+                                        Click="OnDeleteEntryClicked"
+                                        AutomationProperties.Name="{Binding DeleteActionLabel}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Text="{Binding EmptyStateMessage}"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       FontFamily="{DynamicResource ShimaFontFamily}"
+                       FontSize="11.5"
+                       Foreground="{DynamicResource TextMuted}"
+                       Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}"
+                       AutomationProperties.AutomationId="ClipboardEmptyStateText" />
+        </Grid>
+    </Grid>
+</UserControl>

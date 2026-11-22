@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -27,9 +28,12 @@ public partial class IslandWindow : Window
     private readonly DispatcherTimer _autoCollapseTimer;
     private readonly DispatcherTimer _clickThroughRestoreTimer;
     private readonly DispatcherTimer _notificationPeekTimer;
+    private readonly List<Func<int, nint, nint, bool>> _extraMessageHooks = [];
 
     private HwndSource? _hwndSource;
-    private Func<int, nint, nint, bool>? _extraMessageHook;
+    private IDisposable? _inputFocusSubscription;
+    private IDisposable? _notificationPeekContentSubscription;
+    private string? _activeNotificationWidgetId;
     private MonitorInfo _currentMonitor;
     private MonitorSelectionMode _monitorSelectionMode = MonitorSelectionMode.Primary;
     private string? _specificMonitorDeviceId;
@@ -37,6 +41,7 @@ public partial class IslandWindow : Window
     private int _hoverExpandDelayMs = 350;
     private int _autoCollapseDelayMs = 450;
     private bool _isClickThroughActive;
+    private bool _interactiveInputActive;
     private IslandShellState _renderedState = IslandShellState.Collapsed;
     private IslandVisualSpec _currentVisualSpec = ConcaveNotchGeometryBuilder.CollapsedSpec;
     private long _transitionGeneration;
@@ -82,14 +87,62 @@ public partial class IslandWindow : Window
         _powerAndMotionMonitor.PowerProfileChanged += OnPowerProfileChanged;
         _powerAndMotionMonitor.SessionLockChanged += OnSessionLockChanged;
         _globalHotkeyService.HotkeyPressed += OnGlobalHotkeyPressed;
+
+        ExpandedLayer.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(OnExpandedLayerPreviewMouseDown), handledEventsToo: true);
+        ExpandedLayer.AddHandler(Keyboard.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(OnExpandedLayerGotKeyboardFocus), handledEventsToo: true);
+        ExpandedLayer.AddHandler(Keyboard.LostKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(OnExpandedLayerLostKeyboardFocus), handledEventsToo: true);
+
+        if (_eventDispatcher is not null)
+        {
+            _inputFocusSubscription = _eventDispatcher.Subscribe<IslandInputFocusRequestedEvent>(
+                evt => Dispatcher.BeginInvoke(() =>
+                {
+                    if (evt.IsActive)
+                    {
+                        BeginInteractiveInput();
+                    }
+                    else
+                    {
+                        EndInteractiveInput();
+                    }
+                }));
+
+            _notificationPeekContentSubscription = _eventDispatcher.Subscribe<NotificationPeekContentEvent>(
+                evt => Dispatcher.BeginInvoke(() =>
+                {
+                    _activeNotificationWidgetId = evt.WidgetId;
+                    SetNotificationContent(evt.Title, evt.Body);
+                }));
+        }
     }
 
     public nint WindowHandle => _hwnd;
 
     public WidgetHost WidgetHost => WidgetHostControl;
 
-    public void SetWindowMessageHook(Func<int, nint, nint, bool>? messageHook) =>
-        _extraMessageHook = messageHook;
+    public void SetWindowMessageHook(Func<int, nint, nint, bool>? messageHook)
+    {
+        _extraMessageHooks.Clear();
+        if (messageHook is not null)
+        {
+            _extraMessageHooks.Add(messageHook);
+        }
+    }
+
+    public void AddWindowMessageHook(Func<int, nint, nint, bool> messageHook)
+    {
+        ArgumentNullException.ThrowIfNull(messageHook);
+        if (!_extraMessageHooks.Contains(messageHook))
+        {
+            _extraMessageHooks.Add(messageHook);
+        }
+    }
+
+    public void RemoveWindowMessageHook(Func<int, nint, nint, bool> messageHook)
+    {
+        ArgumentNullException.ThrowIfNull(messageHook);
+        _extraMessageHooks.Remove(messageHook);
+    }
 
     public void SetWidgetSlots(IReadOnlyList<WidgetSlotItem> slots, string? selectedWidgetId = null) =>
         WidgetHostControl.SetSlots(slots, selectedWidgetId);
@@ -150,6 +203,12 @@ public partial class IslandWindow : Window
 
     public void BeginInteractiveInput()
     {
+        if (_interactiveInputActive)
+        {
+            return;
+        }
+
+        _interactiveInputActive = true;
         _stateManager.SetInputFocusActive(true);
         if (_hwnd != 0)
         {
@@ -159,6 +218,12 @@ public partial class IslandWindow : Window
 
     public void EndInteractiveInput()
     {
+        if (!_interactiveInputActive)
+        {
+            return;
+        }
+
+        _interactiveInputActive = false;
         _stateManager.SetInputFocusActive(false);
         if (_hwnd != 0)
         {
@@ -186,6 +251,11 @@ public partial class IslandWindow : Window
     {
         StopAllTransientTimers();
 
+        _inputFocusSubscription?.Dispose();
+        _inputFocusSubscription = null;
+        _notificationPeekContentSubscription?.Dispose();
+        _notificationPeekContentSubscription = null;
+
         _stateManager.StateChanged -= OnShellStateChanged;
         _stateManager.CompactPillUpdated -= OnCompactPillUpdated;
         _displayTopologyMonitor.MonitorChanged -= OnMonitorChanged;
@@ -195,6 +265,7 @@ public partial class IslandWindow : Window
         _powerAndMotionMonitor.SessionLockChanged -= OnSessionLockChanged;
         _globalHotkeyService.HotkeyPressed -= OnGlobalHotkeyPressed;
 
+        _extraMessageHooks.Clear();
         _hwndSource?.RemoveHook(WndProc);
         _hwndSource = null;
 
@@ -299,6 +370,11 @@ public partial class IslandWindow : Window
         // Cancel any in-flight scale storyboard cleanly before switching target state.
         MorphScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         MorphScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+
+        if (nextState != IslandShellState.Expanded)
+        {
+            EndInteractiveInput();
+        }
 
         if (nextState is IslandShellState.Fullscreen or IslandShellState.Suspended)
         {
@@ -474,11 +550,74 @@ public partial class IslandWindow : Window
             return;
         }
 
+        if (_stateManager.CurrentState == IslandShellState.Notification)
+        {
+            _notificationPeekTimer.Stop();
+            _stateManager.ClearNotificationPeek();
+            _stateManager.RequestUserExpand();
+            if (!string.IsNullOrWhiteSpace(_activeNotificationWidgetId))
+            {
+                WidgetHostControl.SelectWidget(_activeNotificationWidgetId);
+            }
+
+            return;
+        }
+
         if (_stateManager.CurrentState is IslandShellState.Collapsed or IslandShellState.Active)
         {
             _hoverExpandTimer.Stop();
             _stateManager.RequestUserExpand();
         }
+    }
+
+    private void OnExpandedLayerPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        var textInput = FindAncestorTextBox(e.OriginalSource);
+        if (textInput is not null)
+        {
+            BeginInteractiveInput();
+            if (!textInput.IsKeyboardFocused)
+            {
+                textInput.Focus();
+            }
+        }
+        else if (_interactiveInputActive)
+        {
+            EndInteractiveInput();
+        }
+    }
+
+    private void OnExpandedLayerGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (FindAncestorTextBox(e.NewFocus) is not null)
+        {
+            BeginInteractiveInput();
+        }
+    }
+
+    private void OnExpandedLayerLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (FindAncestorTextBox(e.NewFocus) is null)
+        {
+            EndInteractiveInput();
+        }
+    }
+
+    private static TextBoxBase? FindAncestorTextBox(object? source)
+    {
+        for (var current = source as DependencyObject; current is not null;)
+        {
+            if (current is TextBoxBase textBox)
+            {
+                return textBox;
+            }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
@@ -569,10 +708,16 @@ public partial class IslandWindow : Window
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {
-        if (_extraMessageHook is not null && _extraMessageHook(msg, wParam, lParam))
+        if (_extraMessageHooks.Count > 0)
         {
-            handled = true;
-            return 0;
+            foreach (var hook in _extraMessageHooks.ToArray())
+            {
+                if (hook(msg, wParam, lParam))
+                {
+                    handled = true;
+                    return 0;
+                }
+            }
         }
 
         _displayTopologyMonitor.HandleWindowMessage(msg, wParam, lParam, hwnd);

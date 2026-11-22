@@ -15,11 +15,16 @@ using Shima.Infrastructure.Storage;
 using Shima.Presentation.Settings;
 using Shima.Presentation.Shell;
 using Shima.Presentation.Theming;
+using Shima.Widgets.Clipboard;
 using Shima.Widgets.Clock;
+using Shima.Widgets.Inbox;
+using Shima.Widgets.Notes;
 using Shima.Widgets.NowPlaying;
 using Shima.Widgets.VolumeMixer;
 using Shima.WindowsInterop.Audio;
+using Shima.WindowsInterop.Clipboard;
 using Shima.WindowsInterop.Media;
+using Shima.WindowsInterop.Notifications;
 using Shima.WindowsInterop.Overlay;
 using Shima.WindowsInterop.System;
 
@@ -153,6 +158,10 @@ public partial class App : Application
 
             islandWindow.Show();
 
+            var clipboardMonitor = _serviceProvider.GetRequiredService<IClipboardMonitorAdapter>();
+            clipboardMonitor.AttachHostWindow(islandWindow.WindowHandle);
+            islandWindow.AddWindowMessageHook(clipboardMonitor.HandleWindowMessage);
+
             var hotkeyService = _serviceProvider.GetRequiredService<IGlobalHotkeyService>();
             TryApplyGlobalHotkey(hotkeyService, islandWindow.WindowHandle, preferences.GlobalToggleHotkey);
 
@@ -202,6 +211,12 @@ public partial class App : Application
             try
             {
                 var window = _serviceProvider.GetService<IslandWindow>();
+                var clipboardMonitor = _serviceProvider.GetService<IClipboardMonitorAdapter>();
+                if (window is not null && clipboardMonitor is not null)
+                {
+                    window.RemoveWindowMessageHook(clipboardMonitor.HandleWindowMessage);
+                }
+
                 if (window is { IsLoaded: true })
                 {
                     window.Close();
@@ -325,6 +340,9 @@ public partial class App : Application
         services.AddSingleton(_ => new SqliteMigrationRunner(databasePath));
         services.AddSingleton<IWidgetConfigRepository>(_ => new SqliteWidgetConfigRepository(databasePath));
         services.AddSingleton<IClockRepository>(_ => new ClockRepository(databasePath));
+        services.AddSingleton<INoteRepository>(_ => new NoteRepository(databasePath));
+        services.AddSingleton<IClipboardRepository>(_ => new ClipboardRepository(databasePath, dataRoot));
+        services.AddSingleton<IInboxRepository>(_ => new InboxRepository(databasePath, dataRoot));
 
         services.AddSingleton<IEventDispatcher, InMemoryEventDispatcher>();
         services.AddSingleton<IOverlayPinController, OverlayPinController>();
@@ -332,6 +350,8 @@ public partial class App : Application
         services.AddSingleton<IIslandAttentionRequester, IslandAttentionRequester>();
         services.AddSingleton<IMediaSessionAdapter, MediaSessionAdapter>();
         services.AddSingleton<IAudioMixerAdapter, AudioMixerAdapter>();
+        services.AddSingleton<IClipboardMonitorAdapter, ClipboardMonitorAdapter>();
+        services.AddSingleton<INotificationListenerAdapter, NotificationListenerAdapter>();
 
         services.AddSingleton<IEnumerable<WidgetModuleRegistration>>(sp =>
         [
@@ -356,6 +376,50 @@ public partial class App : Application
                     DefaultAccentHex = "#34D399"
                 },
                 () => new NowPlayingWidgetModule(sp.GetRequiredService<IMediaSessionAdapter>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = NotesWidgetModule.Id,
+                    DisplayName = "Notes",
+                    DefaultOrder = 3,
+                    RequiresBackgroundSubscription = false,
+                    SupportsCompactActiveState = false,
+                    SupportsNotificationPeek = false,
+                    DefaultAccentHex = "#FBBF24"
+                },
+                () => new NotesWidgetModule(
+                    sp.GetRequiredService<INoteRepository>(),
+                    sp.GetRequiredService<IClipboardMonitorAdapter>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = InboxWidgetModule.Id,
+                    DisplayName = "Inbox",
+                    DefaultOrder = 4,
+                    RequiresBackgroundSubscription = true,
+                    SupportsCompactActiveState = false,
+                    SupportsNotificationPeek = true,
+                    DefaultAccentHex = "#F43F5E"
+                },
+                () => new InboxWidgetModule(
+                    sp.GetRequiredService<INotificationListenerAdapter>(),
+                    sp.GetRequiredService<IInboxRepository>(),
+                    sp.GetRequiredService<IAppPreferencesService>())),
+            new WidgetModuleRegistration(
+                new WidgetDescriptor
+                {
+                    WidgetId = ClipboardWidgetModule.Id,
+                    DisplayName = "Clipboard",
+                    DefaultOrder = 5,
+                    RequiresBackgroundSubscription = true,
+                    SupportsCompactActiveState = false,
+                    SupportsNotificationPeek = false,
+                    DefaultAccentHex = "#38BDF8"
+                },
+                () => new ClipboardWidgetModule(
+                    sp.GetRequiredService<IClipboardMonitorAdapter>(),
+                    sp.GetRequiredService<IClipboardRepository>(),
+                    sp.GetRequiredService<IAppPreferencesService>())),
             new WidgetModuleRegistration(
                 new WidgetDescriptor
                 {
