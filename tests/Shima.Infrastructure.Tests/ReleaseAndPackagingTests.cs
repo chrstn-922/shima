@@ -71,10 +71,21 @@ public sealed class ReleaseAndPackagingTests
         appManifestDoc.Descendants(asmV3Ns + "requestedExecutionLevel").Single()
             .Attribute("level")!.Value.Should().Be("asInvoker");
 
-        // Verify exact PNG dimensions for all Sparse MSIX assets
+        // Verify exact PNG dimensions for all Sparse MSIX assets including Win11 taskbar targetsize & unplated variants
         AssertPngDimensions(Path.Combine(repoRoot, "build", "sparse-msix", "Assets", "StoreLogo.png"), 50, 50);
         AssertPngDimensions(Path.Combine(repoRoot, "build", "sparse-msix", "Assets", "Square44x44Logo.png"), 44, 44);
         AssertPngDimensions(Path.Combine(repoRoot, "build", "sparse-msix", "Assets", "Square150x150Logo.png"), 150, 150);
+        foreach (var targetSize in new[] { 16, 24, 32, 48, 256 })
+        {
+            AssertPngDimensions(
+                Path.Combine(repoRoot, "build", "sparse-msix", "Assets", $"Square44x44Logo.targetsize-{targetSize}.png"),
+                targetSize,
+                targetSize);
+            AssertPngDimensions(
+                Path.Combine(repoRoot, "build", "sparse-msix", "Assets", $"Square44x44Logo.altform-unplated_targetsize-{targetSize}.png"),
+                targetSize,
+                targetSize);
+        }
 
         // Verify source brand SVG and multi-size PNG-compressed Shima.ico frames (16, 24, 32, 48, 64, 256)
         File.Exists(Path.Combine(repoRoot, "assets", "branding", "shima-cradled-island.svg")).Should().BeTrue();
@@ -121,6 +132,9 @@ public sealed class ReleaseAndPackagingTests
         innoScript.Should().Contain("runasoriginaluser runhidden waituntilterminated");
         innoScript.Should().Contain("nowait postinstall skipifsilent runasoriginaluser");
         innoScript.Should().Contain("-Unregister");
+        innoScript.Should().Contain("Assets");
+        innoScript.Should().Contain("{app}\\Assets");
+        innoScript.Should().Contain("resources.pri");
 
         var registerScript = File.ReadAllText(Path.Combine(buildDir, "register-sparse-identity.ps1"));
         registerScript.Should().Contain("$TrustEmbeddedCert");
@@ -133,6 +147,14 @@ public sealed class ReleaseAndPackagingTests
         buildScript.Should().Contain("installerSha256");
         buildScript.Should().Contain("$CreateDevSelfSignedCert");
         buildScript.Should().Contain("AllowUntrustedSelfSigned");
+        buildScript.Should().Contain("makepri.exe");
+        buildScript.Should().Contain("resources.pri");
+        buildScript.Should().Contain("$publishAssetsDir");
+        buildScript.Should().Contain("Assets\\*.png");
+
+        var iconGenScript = File.ReadAllText(Path.Combine(buildDir, "generate-brand-icons.ps1"));
+        iconGenScript.Should().Contain("altform-unplated_targetsize-");
+        iconGenScript.Should().Contain("targetsize-");
 
         var srcRoot = Path.Combine(repoRoot, "src");
         foreach (var file in Directory.EnumerateFiles(srcRoot, "*.*", SearchOption.AllDirectories))

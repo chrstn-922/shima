@@ -226,6 +226,55 @@ function Render-SvgToPngBytes {
     }
 }
 
+function Assert-PngHasVisibleOpaquePixels {
+    param(
+        [byte[]]$PngBytes,
+        [int]$ExpectedSize,
+        [string]$AssetName
+    )
+
+    $ms = New-Object System.IO.MemoryStream($PngBytes, $false)
+    try {
+        $frame = [System.Windows.Media.Imaging.BitmapFrame]::Create(
+            $ms,
+            [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,
+            [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
+
+        if ($frame.PixelWidth -ne $ExpectedSize -or $frame.PixelHeight -ne $ExpectedSize) {
+            throw "Asset '$AssetName' rendered at $($frame.PixelWidth)x$($frame.PixelHeight), expected ${ExpectedSize}x${ExpectedSize}."
+        }
+
+        $bgra = New-Object System.Windows.Media.Imaging.FormatConvertedBitmap($frame, [System.Windows.Media.PixelFormats]::Bgra32, $null, 0.0)
+        $stride = $bgra.PixelWidth * 4
+        $pixels = New-Object byte[] ($stride * $bgra.PixelHeight)
+        $bgra.CopyPixels($pixels, $stride, 0)
+
+        $nonZeroAlphaCount = 0
+        $opaqueAlphaCount = 0
+        for ($i = 3; $i -lt $pixels.Length; $i += 4) {
+            $alpha = $pixels[$i]
+            if ($alpha -gt 0) {
+                $nonZeroAlphaCount++
+                if ($alpha -ge 200) {
+                    $opaqueAlphaCount++
+                }
+            }
+        }
+
+        if ($nonZeroAlphaCount -eq 0 -or $opaqueAlphaCount -eq 0) {
+            throw "Asset '$AssetName' rendered with an empty alpha channel (nonZeroAlpha=$nonZeroAlphaCount, opaque=$opaqueAlphaCount)."
+        }
+
+        return [pscustomobject]@{
+            TotalPixels  = $bgra.PixelWidth * $bgra.PixelHeight
+            OpaquePixels = $opaqueAlphaCount
+        }
+    }
+    finally {
+        $ms.Dispose()
+    }
+}
+
 function Write-MultiSizeIco {
     param(
         [string]$Path,
@@ -288,16 +337,27 @@ function Write-MultiSizeIco {
 New-Item -ItemType Directory -Force -Path $SparseAssetsDir | Out-Null
 
 $sparseOutputs = [ordered]@{
-    'StoreLogo.png'         = 50
-    'Square44x44Logo.png'   = 44
-    'Square150x150Logo.png' = 150
+    'StoreLogo.png'                                      = 50
+    'Square44x44Logo.png'                                = 44
+    'Square150x150Logo.png'                              = 150
+    'Square44x44Logo.targetsize-16.png'                  = 16
+    'Square44x44Logo.targetsize-24.png'                  = 24
+    'Square44x44Logo.targetsize-32.png'                  = 32
+    'Square44x44Logo.targetsize-48.png'                  = 48
+    'Square44x44Logo.targetsize-256.png'                 = 256
+    'Square44x44Logo.altform-unplated_targetsize-16.png'  = 16
+    'Square44x44Logo.altform-unplated_targetsize-24.png'  = 24
+    'Square44x44Logo.altform-unplated_targetsize-32.png'  = 32
+    'Square44x44Logo.altform-unplated_targetsize-48.png'  = 48
+    'Square44x44Logo.altform-unplated_targetsize-256.png' = 256
 }
 
 foreach ($entry in $sparseOutputs.GetEnumerator()) {
     $outPath = Join-Path $SparseAssetsDir $entry.Key
     [byte[]]$png = Render-SvgToPngBytes -SizePx $entry.Value
+    $pixelStats = Assert-PngHasVisibleOpaquePixels -PngBytes $png -ExpectedSize $entry.Value -AssetName $entry.Key
     [System.IO.File]::WriteAllBytes($outPath, $png)
-    Write-Host "Generated $outPath ($($entry.Value)x$($entry.Value), $($png.Length) bytes)"
+    Write-Host "Generated $outPath ($($entry.Value)x$($entry.Value), $($png.Length) bytes, $($pixelStats.OpaquePixels)/$($pixelStats.TotalPixels) opaque pixels)"
 }
 
 $icoSizes = @(16, 24, 32, 48, 64, 256)

@@ -56,6 +56,26 @@ function Resolve-MakeAppxPath {
     throw "MakeAppx.exe was not found. Install Windows 10/11 SDK."
 }
 
+function Resolve-MakePriPath {
+    $kitsRoot = 'C:\Program Files (x86)\Windows Kits\10\bin'
+    if (Test-Path $kitsRoot) {
+        $candidate = Get-ChildItem -Path $kitsRoot -Filter 'makepri.exe' -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\makepri\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+        if ($null -ne $candidate) {
+            return $candidate.FullName
+        }
+    }
+
+    $cmd = Get-Command 'makepri.exe' -ErrorAction SilentlyContinue
+    if ($null -ne $cmd) {
+        return $cmd.Source
+    }
+
+    return $null
+}
+
 function Resolve-IsccPath {
     $cmd = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
     if ($null -ne $cmd) {
@@ -88,6 +108,10 @@ $releasesRoot = Join-Path $repoRoot 'artifacts\releases'
 New-Item -ItemType Directory -Force -Path $releasesRoot | Out-Null
 
 $makeAppx = Resolve-MakeAppxPath
+$makePri = Resolve-MakePriPath
+if ($null -eq $makePri) {
+    Write-Warning "MakePri.exe was not found in Windows 10/11 SDK or PATH; Sparse MSIX packages will be built without a generated resources.pri index."
+}
 $isccPath = Resolve-IsccPath
 if ($null -eq $isccPath) {
     Write-Warning "Inno Setup compiler ('ISCC.exe') was not found in PATH or standard install locations. Portable .zip and Sparse MSIX artifacts will still be built; install Inno Setup 6 to build Shima-Setup installers."
@@ -225,6 +249,39 @@ foreach ($rid in $Runtimes) {
         $xmlWriter.Dispose()
     }
 
+    if ($null -ne $makePri) {
+        $sparsePriTempDir = Join-Path $repoRoot "artifacts\sparse-pri\$rid"
+        $priConfigPath = Join-Path $sparsePriTempDir 'priconfig.xml'
+        $stagedPriPath = Join-Path $sparseStageDir 'resources.pri'
+
+        try {
+            if (Test-Path $sparsePriTempDir) {
+                Remove-Item -Path $sparsePriTempDir -Recurse -Force
+            }
+            New-Item -ItemType Directory -Force -Path $sparsePriTempDir | Out-Null
+
+            Write-Host "Generating MRT resource index (resources.pri) via MakePri for $rid..."
+            & $makePri createconfig /cf $priConfigPath /dq en-US /pv 10.0.0 /o | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw "MakePri createconfig failed for $rid with exit code $LASTEXITCODE."
+            }
+
+            & $makePri new /pr $sparseStageDir /cf $priConfigPath /mn $stagedManifestPath /of $stagedPriPath /o
+            if ($LASTEXITCODE -ne 0) {
+                throw "MakePri new failed for $rid with exit code $LASTEXITCODE."
+            }
+
+            if (-not (Test-Path $stagedPriPath) -or (Get-Item $stagedPriPath).Length -le 0) {
+                throw "Expected generated resources.pri was not created at '$stagedPriPath'."
+            }
+        }
+        finally {
+            if (Test-Path $sparsePriTempDir) {
+                Remove-Item -Path $sparsePriTempDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     $msixPath = Join-Path $releaseDir "Shima.Identity-$rid.msix"
     $sparseValidateRoot = Join-Path $repoRoot 'artifacts\sparse-validate'
     $sparseValidateDir = Join-Path $sparseValidateRoot $rid
@@ -263,7 +320,26 @@ foreach ($rid in $Runtimes) {
     $msixZip = [System.IO.Compression.ZipFile]::OpenRead($msixPath)
     try {
         $entryNames = @($msixZip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
-        foreach ($requiredEntry in @('AppxManifest.xml', 'Assets/StoreLogo.png', 'Assets/Square44x44Logo.png', 'Assets/Square150x150Logo.png')) {
+        $requiredEntries = @(
+            'AppxManifest.xml',
+            'Assets/StoreLogo.png',
+            'Assets/Square44x44Logo.png',
+            'Assets/Square150x150Logo.png',
+            'Assets/Square44x44Logo.targetsize-16.png',
+            'Assets/Square44x44Logo.targetsize-24.png',
+            'Assets/Square44x44Logo.targetsize-32.png',
+            'Assets/Square44x44Logo.targetsize-48.png',
+            'Assets/Square44x44Logo.targetsize-256.png',
+            'Assets/Square44x44Logo.altform-unplated_targetsize-16.png',
+            'Assets/Square44x44Logo.altform-unplated_targetsize-24.png',
+            'Assets/Square44x44Logo.altform-unplated_targetsize-32.png',
+            'Assets/Square44x44Logo.altform-unplated_targetsize-48.png',
+            'Assets/Square44x44Logo.altform-unplated_targetsize-256.png'
+        )
+        if ($null -ne $makePri) {
+            $requiredEntries += 'resources.pri'
+        }
+        foreach ($requiredEntry in $requiredEntries) {
             if ($entryNames -notcontains $requiredEntry) {
                 throw "Sparse MSIX '$msixPath' missing required entry '$requiredEntry'."
             }
@@ -281,6 +357,15 @@ foreach ($rid in $Runtimes) {
     Copy-Item -Path $msixPath -Destination $publishSparseDir -Force
     Copy-Item -Path $registerScriptPath -Destination $publishSparseDir -Force
     $bundledMsixPath = Join-Path $publishSparseDir (Split-Path -Leaf $msixPath)
+
+    $publishAssetsDir = Join-Path $publishDir 'Assets'
+    New-Item -ItemType Directory -Force -Path $publishAssetsDir | Out-Null
+    Copy-Item -Path (Join-Path $sparseStageDir 'Assets\*.png') -Destination $publishAssetsDir -Force
+
+    $stagedPriPath = Join-Path $sparseStageDir 'resources.pri'
+    if (Test-Path $stagedPriPath) {
+        Copy-Item -Path $stagedPriPath -Destination (Join-Path $publishDir 'resources.pri') -Force
+    }
 
     if ($Sign) {
         $signTargets = @(

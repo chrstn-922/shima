@@ -1,12 +1,15 @@
 using System.IO;
 using IoPath = System.IO.Path;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Automation.Peers;
 using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
@@ -22,6 +25,7 @@ using Shima.Infrastructure.Persistence;
 using Shima.Infrastructure.Repositories;
 using Shima.Infrastructure.Services;
 using Shima.Infrastructure.Storage;
+using Shima.Presentation.ColorPicker;
 using Shima.Presentation.Settings;
 using Shima.Presentation.Theming;
 using Shima.Widgets.Clipboard;
@@ -437,6 +441,106 @@ public sealed class ReleaseVerificationUiTests
 
         return results;
     }
+
+    [Fact]
+    public async Task SettingsAndColorPickerWindows_ExposeValidWindowIconAndNativeSmallAndBigTaskbarIconHandles()
+    {
+        const int wmGetIcon = 0x007F;
+        const int iconSmall = 0;
+        const int iconBig = 1;
+
+        var rootDir = IoPath.Combine(IoPath.GetTempPath(), "shima-window-icon-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDir);
+
+        try
+        {
+            var prefsStore = new AppPreferencesStore(new AtomicConfigStore<AppPreferences>(rootDir));
+            var prefsService = new AppPreferencesService(prefsStore, new DpapiSecretStore());
+            await prefsService.InitializeAsync();
+
+            var colorService = new ColorProcessingService();
+            var pinController = new OverlayPinController();
+            var presetManager = new PresetManager(
+                new AtomicPresetCatalogRepository(new AtomicConfigStore<PresetCatalog>(rootDir)),
+                colorService);
+            var appearanceManager = new AppearanceManager(
+                new AtomicAppearanceConfigRepository(new AtomicConfigStore<AppearanceConfiguration>(rootDir)),
+                presetManager,
+                colorService,
+                pinController);
+            await appearanceManager.InitializeAsync();
+            var diagService = new DiagnosticLogService(IoPath.Combine(rootDir, "logs"));
+
+            using var host = new StaWpfTestHost();
+            var (settingsIcon, settingsSmall, settingsBig, pickerIcon, pickerSmall, pickerBig) = await host.RunAsync(() =>
+            {
+                var themeRenderer = new ThemeRenderer(appearanceManager, colorService, Dispatcher.CurrentDispatcher);
+                var settings = new SettingsWindow(
+                    appearanceManager,
+                    presetManager,
+                    colorService,
+                    prefsService,
+                    diagService,
+                    themeRenderer: themeRenderer)
+                {
+                    ShowActivated = false,
+                    Left = -20000,
+                    Top = -20000
+                };
+                settings.Show();
+
+                var settingsHwnd = new WindowInteropHelper(settings).Handle;
+                var sIcon = settings.Icon as BitmapSource;
+                var sSmall = SendMessageW(settingsHwnd, wmGetIcon, (nint)iconSmall, 0);
+                var sBig = SendMessageW(settingsHwnd, wmGetIcon, (nint)iconBig, 0);
+
+                var pickerRequest = new ColorPickerRequest(
+                    AppearanceTokenSlot.Accent,
+                    IslandStateTarget.Expanded,
+                    "Accent",
+                    IslandColorPalette.MidnightAccent,
+                    PreviewTargetState.Expanded);
+                var picker = new ColorPickerDialog(appearanceManager, colorService, pickerRequest, presetManager)
+                {
+                    Owner = settings,
+                    ShowActivated = false,
+                    Left = -20000,
+                    Top = -20000
+                };
+                picker.Show();
+
+                var pickerHwnd = new WindowInteropHelper(picker).Handle;
+                var pIcon = picker.Icon as BitmapSource;
+                var pSmall = SendMessageW(pickerHwnd, wmGetIcon, (nint)iconSmall, 0);
+                var pBig = SendMessageW(pickerHwnd, wmGetIcon, (nint)iconBig, 0);
+
+                picker.Close();
+                settings.Close();
+
+                return (sIcon, sSmall, sBig, pIcon, pSmall, pBig);
+            });
+
+            settingsIcon.Should().NotBeNull();
+            settingsIcon!.PixelWidth.Should().BeGreaterOrEqualTo(32);
+            settingsSmall.Should().NotBe(0);
+            settingsBig.Should().NotBe(0);
+
+            pickerIcon.Should().NotBeNull();
+            pickerIcon!.PixelWidth.Should().BeGreaterOrEqualTo(32);
+            pickerSmall.Should().NotBe(0);
+            pickerBig.Should().NotBe(0);
+        }
+        finally
+        {
+            if (Directory.Exists(rootDir))
+            {
+                Directory.Delete(rootDir, recursive: true);
+            }
+        }
+    }
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern nint SendMessageW(nint hWnd, int msg, nint wParam, nint lParam);
 
     private static IEnumerable<T> FindAllDescendants<T>(DependencyObject root) where T : DependencyObject
     {

@@ -46,7 +46,7 @@ public partial class ColorPickerDialog : Window
             initialPreviewState: _request.InitialPreviewState);
 
         InitializeComponent();
-        Icon = BrandIconLoader.TryLoadWindowIcon();
+        BrandIconLoader.AttachWindowIcons(this);
         NumericInputs.ConfigureColorService(_colorService);
 
         _currentColor = _colorService.TryParseHex(_request.InitialHex, out var initial) && initial is not null
