@@ -84,6 +84,10 @@ dotnet run --project src/Shima.App -c Release
 .\build\build-release.ps1 -Sign -CreateDevSelfSignedCert
 ```
 
+## Feedback & Bug Reports
+
+Found a bug or have a widget idea? Open an issue on [GitHub Issues](https://github.com/chrstn-922/shima/issues). When reporting a bug, attach a sanitized log bundle via **Shima Settings → General → Diagnostic logs (sanitized) → Export bundle** to help speed up investigation.
+
 ## License
 
 Shima is licensed under the [MIT License](LICENSE).

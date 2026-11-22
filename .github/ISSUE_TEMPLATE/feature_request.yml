@@ -1,0 +1,44 @@
+name: Feature Request
+description: Suggest a new widget idea, integration, or improvement for Shima
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a new Shima widget, customization option, or quality-of-life improvement? Share it below!
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New Widget Idea
+        - Existing Widget Enhancement
+        - Dynamic Island Shell & Behavior
+        - Appearance & Color Picker
+        - Developer Integrations (Claude Code / OpenCode)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Use Case or Problem
+      description: What workflow or pain point would this feature solve?
+      placeholder: It would be great if Shima could...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Behavior
+      description: Describe how you imagine it working across the collapsed notch, compact pill, expanded widget view, or Settings.
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Optional mockups, screenshots, references, or Windows API notes.
+    validations:
+      required: false
