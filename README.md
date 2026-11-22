@@ -35,8 +35,10 @@ Shima sits flush at the top-center edge of your Windows screen, stays collapsed 
 
 ### One-Line Terminal Install (Optional)
 
-```powershell
-irm https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe -OutFile "$env:TEMP\Shima-Setup.exe"; Start-Process "$env:TEMP\Shima-Setup.exe"
+Paste this into Command Prompt, PowerShell, or the Windows Run dialog (`Win + R`) to download and launch the v1.0.0 installer automatically:
+
+```bat
+powershell -Command "irm https://github.com/chrstn-922/shima/releases/download/v1.0.0/Shima-Setup-1.0.0-win-x64.exe -OutFile ([IO.Path]::GetTempPath()+'Shima-Setup.exe'); Start-Process ([IO.Path]::GetTempPath()+'Shima-Setup.exe')"
 ```
 
 ## Features
