@@ -580,6 +580,77 @@ public sealed class ProductivityWidgetsTests
         staException.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(NotificationAccessState.IdentityUnavailable)]
+    [InlineData(NotificationAccessState.DeniedByUserOrPolicy)]
+    [InlineData(NotificationAccessState.UnsupportedOs)]
+    public async Task InboxView_GuidanceCardAndButtons_FitInside140DipWithoutVerticalClippingOnStaDispatcher(
+        NotificationAccessState accessState)
+    {
+        var now = new DateTimeOffset(2026, 11, 22, 15, 25, 0, TimeSpan.Zero);
+        var backend = new FakeNotificationNativeBackend
+        {
+            AccessState = accessState
+        };
+        using var notifAdapter = new NotificationListenerAdapter(backend);
+        await using var inbox = new InboxWidgetModule(notifAdapter, new InMemoryInboxRepository(), utcNowProvider: () => now);
+        await inbox.InitializeAsync(CreateContext(InboxWidgetModule.Id), CancellationToken.None);
+
+        Exception? staException = null;
+        var completed = new ManualResetEventSlim(false);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var inboxView = inbox.CreateExpandedView().Should().BeOfType<InboxView>().Subject;
+                inboxView.Measure(new Size(348, 140));
+                inboxView.Arrange(new Rect(0, 0, 348, 140));
+                inboxView.UpdateLayout();
+
+                var card = FindVisualDescendants<Border>(inboxView)
+                    .Single(b => AutomationProperties.GetAutomationId(b) == "InboxAccessGuidanceCard");
+                card.Visibility.Should().Be(Visibility.Visible);
+
+                var cardBottomY = card.TranslatePoint(new Point(0, card.ActualHeight), inboxView).Y;
+                var cardTopY = card.TranslatePoint(new Point(0, 0), inboxView).Y;
+                cardTopY.Should().BeGreaterOrEqualTo(0);
+                cardBottomY.Should().BeLessOrEqualTo(140.1);
+                card.DesiredSize.Height.Should().BeLessOrEqualTo(card.ActualHeight + 0.5);
+
+                var visibleButtons = FindVisualDescendants<Button>(card)
+                    .Where(b => b.Visibility == Visibility.Visible)
+                    .ToList();
+                visibleButtons.Should().NotBeEmpty();
+
+                foreach (var btn in visibleButtons)
+                {
+                    btn.ActualHeight.Should().BeGreaterThan(0);
+                    var btnTop = btn.TranslatePoint(new Point(0, 0), card).Y;
+                    var btnBottom = btn.TranslatePoint(new Point(0, btn.ActualHeight), card).Y;
+                    btnTop.Should().BeGreaterOrEqualTo(0);
+                    btnBottom.Should().BeLessOrEqualTo(card.ActualHeight - card.BorderThickness.Bottom + 0.1);
+
+                    var btnBottomInView = btn.TranslatePoint(new Point(0, btn.ActualHeight), inboxView).Y;
+                    btnBottomInView.Should().BeLessOrEqualTo(140.1);
+                }
+            }
+            catch (Exception ex)
+            {
+                staException = ex;
+            }
+            finally
+            {
+                Dispatcher.CurrentDispatcher.InvokeShutdown();
+                completed.Set();
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        completed.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
+        staException.Should().BeNull();
+    }
+
     [Fact]
     public async Task ClipboardView_PinnedAndUnpinnedRows_BindIndicatorPinLabelAndButtonsWithoutClippingOnStaDispatcher()
     {

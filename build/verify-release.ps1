@@ -95,6 +95,16 @@ try {
             if ($actualSha -ne $pkg.sha256) {
                 throw "SHA-256 mismatch for $($pkg.fileName)."
             }
+            if ($pkg.PSObject.Properties['installerFileName'] -and -not [string]::IsNullOrWhiteSpace($pkg.installerFileName)) {
+                $installerFile = Join-Path $ridDir $pkg.installerFileName
+                if (-not (Test-Path $installerFile)) {
+                    throw "Missing installer artifact '$($pkg.installerFileName)' for $($pkg.architecture)."
+                }
+                $actualInstallerSha = (Get-FileHash -Path $installerFile -Algorithm SHA256).Hash.ToLowerInvariant()
+                if ($actualInstallerSha -ne $pkg.installerSha256) {
+                    throw "SHA-256 mismatch for $($pkg.installerFileName)."
+                }
+            }
             $verifiedCount++
         }
         Record-Gate -Gate 'Dual-RID Packaging & Sparse MSIX' -Passed ($verifiedCount -eq 2) -Details "$verifiedCount RIDs (win-x64, win-arm64) + MSIX + SHA-256 manifest verified"

@@ -79,13 +79,13 @@
 
         <!-- Collapsed notch status indicator (e.g., opt-in Developer Activity bar) -->
         <ContentPresenter x:Name="CollapsedOverlayContentPresenter"
-                          Margin="20,0,20,7"
+                          Margin="{DynamicResource IslandCollapsedOverlayPadding}"
                           VerticalAlignment="Bottom"
                           Visibility="Collapsed" />
 
         <!-- Compact active pill content -->
         <Grid x:Name="ActiveLayer"
-              Margin="18,4,18,4"
+              Margin="{DynamicResource IslandActivePillPadding}"
               Visibility="Collapsed">
             <StackPanel x:Name="ActiveDefaultBadgePanel"
                         Orientation="Horizontal"
@@ -167,7 +167,7 @@
 
         <!-- Expanded panel hosting widget carousel -->
         <Grid x:Name="ExpandedLayer"
-              Margin="26,16,24,16"
+              Margin="{DynamicResource IslandExpandedPadding}"
               Visibility="Collapsed">
             <shell:WidgetHost x:Name="WidgetHostControl" />
         </Grid>

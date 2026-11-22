@@ -175,6 +175,40 @@ public sealed class IslandShellUiTests
         height.Should().BeApproximately(28, 0.5);
     }
 
+    [Fact]
+    public async Task IslandWindow_CompactPillAndCollapsedOverlay_ApplySymmetricConcaveWallInsets()
+    {
+        using var host = new StaWpfTestHost();
+        await using var harness = await host.RunAsync(() => CreateHarness(host));
+
+        await host.RunAsync(() => harness.IslandWindow.Show());
+        await host.PumpAsync();
+
+        var (collapsedPadding, activePadding, activeSpec, activeMargin) = await host.RunAsync(() =>
+        {
+            harness.StateManager.SetCompactActive("shima.nowplaying", isActive: true, badgeText: "Playing");
+            return (
+                (Thickness)harness.IslandWindow.FindResource("IslandCollapsedOverlayPadding"),
+                (Thickness)harness.IslandWindow.FindResource("IslandActivePillPadding"),
+                ConcaveNotchGeometryBuilder.ActiveSpec,
+                ((FrameworkElement)harness.IslandWindow.FindName("ActiveLayer")).Margin);
+        });
+        await host.PumpAsync();
+
+        collapsedPadding.Left.Should().Be(collapsedPadding.Right);
+        (collapsedPadding.Left - ConcaveNotchGeometryBuilder.CollapsedSpec.EarRadiusDip).Should().BeGreaterOrEqualTo(10);
+
+        activePadding.Left.Should().Be(activePadding.Right);
+        activeMargin.Should().Be(activePadding);
+        (activeMargin.Left - activeSpec.EarRadiusDip).Should().BeGreaterOrEqualTo(14);
+        activeMargin.Left.Should().BeGreaterOrEqualTo(activeSpec.EarRadiusDip + activeSpec.BottomRadiusDip);
+
+        var (activeW, activeH) = await host.RunAsync(() =>
+            (harness.IslandWindow.ActualWidth, harness.IslandWindow.ActualHeight));
+        activeW.Should().BeApproximately(activeSpec.WidthDip, 1.0);
+        activeH.Should().BeApproximately(activeSpec.HeightDip, 1.0);
+    }
+
     private static UiTestHarness CreateHarness(StaWpfTestHost host)
     {
         using var realTopology = new DisplayTopologyMonitor();

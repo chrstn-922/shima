@@ -166,8 +166,8 @@ public sealed class ColorPickerUiTests
 
         var (expandedW, expandedH) = await host.RunAsync(() =>
             (harness.IslandWindow.ActualWidth, harness.IslandWindow.ActualHeight));
-        expandedW.Should().BeApproximately(412.0, 1.0);
-        expandedH.Should().BeApproximately(168.0, 1.0);
+        expandedW.Should().BeApproximately(ConcaveNotchGeometryBuilder.ExpandedSpec.WidthDip, 1.0);
+        expandedH.Should().BeApproximately(ConcaveNotchGeometryBuilder.ExpandedSpec.HeightDip, 1.0);
 
         File.Exists(appearanceFile).Should().BeFalse();
 

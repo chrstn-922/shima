@@ -170,11 +170,11 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
     {
         NotificationAccessState.Allowed => "Capturing native Windows Action Center toasts locally.",
         NotificationAccessState.DeniedByUserOrPolicy =>
-            "Allow Shima to read notifications in Windows Privacy Settings, or grant access below. " + NonNativePopupNotice,
+            "Allow Shima in Windows Notification Settings, or grant access below. Custom app popups aren't captured.",
         NotificationAccessState.UnsupportedOs =>
-            "Native UserNotificationListener requires Windows 10 version 1809 or newer. Other Shima widgets continue operating normally.",
+            "Requires Windows 10 (1809+) for native notifications. Other Shima widgets continue operating normally.",
         _ =>
-            "Notification listener requires Sparse MSIX package identity registration. Other Shima widgets continue operating normally. " + NonNativePopupNotice
+            "Register Sparse MSIX identity (or run Shima Setup) to unlock live toasts. Other widgets work normally."
     };
 
     public string AccessStatusLabel => _accessState switch

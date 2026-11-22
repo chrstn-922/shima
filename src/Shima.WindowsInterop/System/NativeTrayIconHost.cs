@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -24,12 +25,18 @@ public sealed unsafe class NativeTrayIconHost : IDisposable
     private const uint WmRButtonUp = 0x0205;
     private const uint WmContextMenu = 0x007B;
     private const nuint IdiApplication = 32512;
+    private const uint ImageIcon = 1;
+    private const uint LrDefaultColor = 0x00000000;
+    private const uint LrLoadFromFile = 0x00000010;
+    private const int SmCxSmIcon = 49;
+    private const int SmCySmIcon = 50;
 
     private readonly Func<IReadOnlyList<TrayMenuItem>> _menuItemsFactory;
     private readonly uint _taskbarCreatedMsg;
 
     private nint _hwnd;
     private HICON _iconHandle;
+    private bool _ownsIconHandle;
     private string _tooltip = "Shima Dynamic Island";
     private bool _isAdded;
     private bool _disposed;
@@ -44,7 +51,7 @@ public sealed unsafe class NativeTrayIconHost : IDisposable
 
     public event EventHandler<uint>? MenuItemClicked;
 
-    public void Attach(nint hwnd, string tooltip)
+    public void Attach(nint hwnd, string tooltip, string? iconPath = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (hwnd == 0)
@@ -52,9 +59,10 @@ public sealed unsafe class NativeTrayIconHost : IDisposable
             throw new ArgumentException("Window handle must be non-zero.", nameof(hwnd));
         }
 
+        ReleaseOwnedIcon();
         _hwnd = hwnd;
         _tooltip = TrimTooltip(tooltip);
-        _iconHandle = PInvoke.LoadIcon(default, new PCWSTR((char*)IdiApplication));
+        (_iconHandle, _ownsIconHandle) = ResolveTrayIconHandle(iconPath);
 
         AddTrayIcon();
     }
@@ -121,6 +129,73 @@ public sealed unsafe class NativeTrayIconHost : IDisposable
             ShellNotifyIconNative(NimDelete, ref data);
             _isAdded = false;
         }
+
+        ReleaseOwnedIcon();
+    }
+
+    internal static bool TryLoadIconFromFile(string iconPath, out HICON iconHandle)
+    {
+        iconHandle = default;
+        if (string.IsNullOrWhiteSpace(iconPath) || !File.Exists(iconPath))
+        {
+            return false;
+        }
+
+        var (cx, cy) = GetSmallIconMetrics();
+        var loaded = LoadImageFromFileNative(0, iconPath, ImageIcon, cx, cy, LrLoadFromFile | LrDefaultColor);
+        if (loaded == 0)
+        {
+            return false;
+        }
+
+        iconHandle = new HICON(loaded);
+        return true;
+    }
+
+    private static (HICON Handle, bool OwnsHandle) ResolveTrayIconHandle(string? iconPath)
+    {
+        if (TryLoadIconFromFile(iconPath ?? string.Empty, out var fileIcon))
+        {
+            return (fileIcon, true);
+        }
+
+        var (cx, cy) = GetSmallIconMetrics();
+        var moduleHandle = GetModuleHandleNative(0);
+        if (moduleHandle != 0)
+        {
+            var embeddedIcon = LoadImageFromResourceNative(
+                moduleHandle,
+                unchecked((nint)IdiApplication),
+                ImageIcon,
+                cx,
+                cy,
+                LrDefaultColor);
+            if (embeddedIcon != 0)
+            {
+                return (new HICON(embeddedIcon), true);
+            }
+        }
+
+        var fallbackIcon = PInvoke.LoadIcon(default, new PCWSTR((char*)IdiApplication));
+        return (fallbackIcon, false);
+    }
+
+    private static (int Width, int Height) GetSmallIconMetrics()
+    {
+        var cx = GetSystemMetricsNative(SmCxSmIcon);
+        var cy = GetSystemMetricsNative(SmCySmIcon);
+        return (cx > 0 ? cx : 16, cy > 0 ? cy : 16);
+    }
+
+    private void ReleaseOwnedIcon()
+    {
+        if (_ownsIconHandle && !_iconHandle.IsNull)
+        {
+            PInvoke.DestroyIcon(_iconHandle);
+        }
+
+        _iconHandle = default;
+        _ownsIconHandle = false;
     }
 
     private static string TrimTooltip(string? tooltip)
@@ -215,6 +290,30 @@ public sealed unsafe class NativeTrayIconHost : IDisposable
     [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconW", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool ShellNotifyIconNative(uint dwMessage, ref NotifyIconData lpData);
+
+    [DllImport("kernel32.dll", EntryPoint = "GetModuleHandleW", SetLastError = true)]
+    private static extern nint GetModuleHandleNative(nint lpModuleName);
+
+    [DllImport("user32.dll", EntryPoint = "GetSystemMetrics")]
+    private static extern int GetSystemMetricsNative(int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "LoadImageW", SetLastError = true)]
+    private static extern nint LoadImageFromResourceNative(
+        nint hInst,
+        nint name,
+        uint type,
+        int cx,
+        int cy,
+        uint fuLoad);
+
+    [DllImport("user32.dll", EntryPoint = "LoadImageW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern nint LoadImageFromFileNative(
+        nint hInst,
+        string name,
+        uint type,
+        int cx,
+        int cy,
+        uint fuLoad);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct NotifyIconData

@@ -51,6 +51,7 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="8" />
             <ColumnDefinition Width="18" />
         </Grid.ColumnDefinitions>
 
@@ -78,7 +79,7 @@
 
         <!-- 8-dot vertical carousel in fixed 18 DIP right column -->
         <ItemsControl x:Name="PagerItemsControl"
-                      Grid.Column="1"
+                      Grid.Column="2"
                       VerticalAlignment="Center"
                       HorizontalAlignment="Center"
                       AutomationProperties.Name="Widget selector pager">

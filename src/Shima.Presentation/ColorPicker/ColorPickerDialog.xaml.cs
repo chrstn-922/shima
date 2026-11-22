@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Shima.Core.Appearance;
 using Shima.Core.Color;
 using Shima.Core.Contracts;
+using Shima.Presentation.Theming;
 
 namespace Shima.Presentation.ColorPicker;
 
@@ -45,6 +46,7 @@ public partial class ColorPickerDialog : Window
             initialPreviewState: _request.InitialPreviewState);
 
         InitializeComponent();
+        Icon = BrandIconLoader.TryLoadWindowIcon();
         NumericInputs.ConfigureColorService(_colorService);
 
         _currentColor = _colorService.TryParseHex(_request.InitialHex, out var initial) && initial is not null

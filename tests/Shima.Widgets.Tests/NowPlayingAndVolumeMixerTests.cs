@@ -1,3 +1,8 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FluentAssertions;
 using NSubstitute;
@@ -249,6 +254,75 @@ public sealed class NowPlayingAndVolumeMixerTests
                 mixer.ViewModel.Sessions.Single().IconBitmap.Should().NotBeNull();
                 mixer.ViewModel.Sessions.Single().IconBitmap!.IsFrozen.Should().BeTrue();
                 mixerView.DataContext.Should().BeSameAs(mixer.ViewModel);
+            }
+            catch (Exception ex)
+            {
+                staException = ex;
+            }
+            finally
+            {
+                Dispatcher.CurrentDispatcher.InvokeShutdown();
+                completed.Set();
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+
+        completed.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
+        staException.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task NowPlayingCompactView_RendersRoundedClippedArtwork_WithoutOverflowInsideWidenedPill()
+    {
+        var now = new DateTimeOffset(2026, 11, 22, 15, 0, 0, TimeSpan.Zero);
+        var bmp = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        using var pngStream = new MemoryStream();
+        encoder.Save(pngStream);
+
+        var adapter = new FakeMediaSessionAdapter
+        {
+            CurrentSession = new MediaSessionSnapshot
+            {
+                SourceAppId = "Spotify.exe",
+                Title = "Resonance (Extended Remaster)",
+                Artist = "HOME",
+                PlaybackState = MediaPlaybackState.Playing,
+                CanPlayPause = true,
+                ThumbnailBytes = pngStream.ToArray(),
+                LastUpdatedUtc = now
+            }
+        };
+
+        await using var nowPlaying = new NowPlayingWidgetModule(adapter, () => now, new FakeNowPlayingTimer());
+        await nowPlaying.InitializeAsync(CreateContext(NowPlayingWidgetModule.Id), CancellationToken.None);
+
+        Exception? staException = null;
+        var completed = new ManualResetEventSlim(false);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var view = nowPlaying.CreateCompactActiveView().Should().BeOfType<NowPlayingCompactView>().Subject;
+                view.Measure(new Size(208, 26));
+                view.Arrange(new Rect(0, 0, 208, 26));
+                view.UpdateLayout();
+
+                var border = view.FindName("CompactArtworkBorder").Should().BeOfType<Border>().Subject;
+                border.CornerRadius.TopLeft.Should().BeGreaterOrEqualTo(4);
+                border.ActualWidth.Should().Be(18);
+                border.ActualHeight.Should().Be(18);
+
+                var innerGrid = border.Child.Should().BeOfType<Grid>().Subject;
+                var clip = innerGrid.Clip.Should().BeOfType<RectangleGeometry>().Subject;
+                clip.RadiusX.Should().BeGreaterOrEqualTo(4);
+                clip.RadiusY.Should().BeGreaterOrEqualTo(4);
+
+                var image = view.FindName("CompactArtworkImage").Should().BeOfType<Image>().Subject;
+                image.Visibility.Should().Be(Visibility.Visible);
+                image.Source.Should().NotBeNull();
             }
             catch (Exception ex)
             {

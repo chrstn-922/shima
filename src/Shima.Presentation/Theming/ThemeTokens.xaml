@@ -45,6 +45,11 @@
     <Color x:Key="AgentStatusErrorColor">#FFEF4444</Color>
 
     <Thickness x:Key="IslandBorderThickness">1</Thickness>
+    <!-- Collapsed & active pill insets account for 12 DIP concave top ears so inner walls have symmetric clearance -->
+    <Thickness x:Key="IslandCollapsedOverlayPadding">24,0,24,7</Thickness>
+    <Thickness x:Key="IslandActivePillPadding">28,4,28,4</Thickness>
+    <!-- Expanded island outer inset (includes 16 DIP concave top-ear offset: 20 DIP left, 18 DIP right, 18 DIP top/bottom inside visible walls) -->
+    <Thickness x:Key="IslandExpandedPadding">36,18,34,18</Thickness>
 
     <!-- Island Surface Brushes -->
     <SolidColorBrush x:Key="SurfaceCollapsed" Color="{DynamicResource SurfaceCollapsedColor}" />

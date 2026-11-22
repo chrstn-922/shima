@@ -20,9 +20,9 @@ public readonly record struct IslandVisualSpec(
 public static class ConcaveNotchGeometryBuilder
 {
     public static readonly IslandVisualSpec CollapsedSpec = new(136, 28, 12, 14);
-    public static readonly IslandVisualSpec ActiveSpec = new(224, 32, 12, 16);
+    public static readonly IslandVisualSpec ActiveSpec = new(264, 34, 12, 16);
     public static readonly IslandVisualSpec NotificationSpec = new(340, 76, 14, 20);
-    public static readonly IslandVisualSpec ExpandedSpec = new(412, 168, 16, 24);
+    public static readonly IslandVisualSpec ExpandedSpec = new(444, 176, 16, 24);
 
     public static IslandVisualSpec GetSpecForState(IslandShellState state) => state switch
     {

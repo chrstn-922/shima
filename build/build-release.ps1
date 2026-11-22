@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Builds, packages (Sparse MSIX + Velopack/portable archives), optionally signs, and generates release manifests for win-x64 and win-arm64.
+Builds, packages (Sparse MSIX + Inno Setup installers + Velopack/portable archives), optionally signs, and generates release manifests for win-x64 and win-arm64.
 #>
 [CmdletBinding()]
 param(
@@ -54,16 +54,46 @@ function Resolve-MakeAppxPath {
     throw "MakeAppx.exe was not found. Install Windows 10/11 SDK."
 }
 
+function Resolve-IsccPath {
+    $cmd = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+    if ($null -ne $cmd) {
+        return $cmd.Source
+    }
+
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $appProject = Join-Path $repoRoot 'src\Shima.App\Shima.App.csproj'
 $bridgeProject = Join-Path $repoRoot 'src\Shima.AgentBridge\Shima.AgentBridge.csproj'
 $sparseTemplateDir = Join-Path $repoRoot 'build\sparse-msix'
 $registerScriptPath = Join-Path $repoRoot 'build\register-sparse-identity.ps1'
 $signScriptPath = Join-Path $repoRoot 'build\sign-artifacts.ps1'
+$innoScriptPath = Join-Path $repoRoot 'build\installer\shima.iss'
 $releasesRoot = Join-Path $repoRoot 'artifacts\releases'
 New-Item -ItemType Directory -Force -Path $releasesRoot | Out-Null
 
 $makeAppx = Resolve-MakeAppxPath
+$isccPath = Resolve-IsccPath
+if ($null -eq $isccPath) {
+    Write-Warning "Inno Setup compiler ('ISCC.exe') was not found in PATH or standard install locations. Portable .zip and Sparse MSIX artifacts will still be built; install Inno Setup 6 to build Shima-Setup installers."
+}
+elseif (-not (Test-Path $innoScriptPath)) {
+    Write-Warning "Inno Setup script '$innoScriptPath' was not found; skipping Shima-Setup installer compilation."
+    $isccPath = $null
+}
 $vpkCmd = Get-Command 'vpk' -ErrorAction SilentlyContinue
 if ($RequireVelopack -and $null -eq $vpkCmd) {
     throw "Velopack CLI ('vpk') is not installed. Run 'dotnet tool install -g vpk' or omit -RequireVelopack."
@@ -226,7 +256,10 @@ foreach ($rid in $Runtimes) {
         & $signScriptPath -Paths $signTargets -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp
     }
 
-    $primaryArtifactPath = $null
+    $zipPath = Join-Path $releaseDir "Shima-$Version-$rid.zip"
+    Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -Force
+
+    $primaryArtifactPath = $zipPath
     if ($null -ne $vpkCmd) {
         Write-Host "Running Velopack pack for $rid..."
         & $vpkCmd.Source pack `
@@ -249,21 +282,37 @@ foreach ($rid in $Runtimes) {
         }
     }
 
-    if ([string]::IsNullOrWhiteSpace($primaryArtifactPath)) {
-        if ($null -eq $vpkCmd) {
-            Write-Warning "Velopack CLI ('vpk') not found in PATH; generating portable release archive alongside Sparse MSIX. Install via 'dotnet tool install -g vpk' to emit Setup.exe + delta .nupkg."
+    $innoInstallerPath = $null
+    if ($null -ne $isccPath) {
+        Write-Host "Compiling Inno Setup installer for $rid via '$isccPath'..."
+        & $isccPath `
+            "/DAppVersion=$Version" `
+            "/DAppFileVersion=$fourPartVersion" `
+            "/DRid=$rid" `
+            "/DSourceDir=$publishDir" `
+            "/DOutputDir=$releaseDir" `
+            $innoScriptPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compiler failed for $rid with exit code $LASTEXITCODE."
         }
 
-        $zipPath = Join-Path $releaseDir "Shima-$Version-$rid.zip"
-        Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -Force
-        $primaryArtifactPath = $zipPath
+        $expectedInstallerPath = Join-Path $releaseDir "Shima-Setup-$Version-$rid.exe"
+        if (-not (Test-Path $expectedInstallerPath)) {
+            throw "Expected Inno Setup output not found at '$expectedInstallerPath'."
+        }
+
+        if ($Sign) {
+            & $signScriptPath -Paths @($expectedInstallerPath) -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -SkipTimestamp:$SkipTimestamp
+        }
+
+        $innoInstallerPath = $expectedInstallerPath
     }
 
     $fileItem = Get-Item $primaryArtifactPath
     $sha256 = (Get-FileHash -Path $primaryArtifactPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $baseUrl = $DownloadBaseUrl.TrimEnd('/')
 
-    $manifestPackages += [ordered]@{
+    $packageEntry = [ordered]@{
         architecture = $rid
         downloadUrl  = "$baseUrl/$($fileItem.Name)"
         sha256       = $sha256
@@ -272,6 +321,16 @@ foreach ($rid in $Runtimes) {
         msixFileName = (Split-Path -Leaf $msixPath)
         msixSha256   = (Get-FileHash -Path $msixPath -Algorithm SHA256).Hash.ToLowerInvariant()
     }
+
+    if ($null -ne $innoInstallerPath) {
+        $installerItem = Get-Item $innoInstallerPath
+        $packageEntry['installerFileName'] = $installerItem.Name
+        $packageEntry['installerDownloadUrl'] = "$baseUrl/$($installerItem.Name)"
+        $packageEntry['installerSha256'] = (Get-FileHash -Path $innoInstallerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $packageEntry['installerSizeBytes'] = [int64]$installerItem.Length
+    }
+
+    $manifestPackages += $packageEntry
 }
 
 $manifestDocument = [ordered]@{

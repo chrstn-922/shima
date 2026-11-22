@@ -49,6 +49,17 @@ Five layers with inward-only dependencies. `Shima.Core` holds contracts and doma
 - [test-strategy.md](docs/blueprint/test-strategy.md), [deployment-strategy.md](docs/blueprint/deployment-strategy.md), [risk-register.md](docs/blueprint/risk-register.md)
 - [development-roadmap.md](docs/blueprint/development-roadmap.md), [architectural-decision-records.md](docs/blueprint/architectural-decision-records.md)
 
+## Installer (Recommended)
+
+For the simplest Windows setup with **Notification Inbox** unlocked automatically on first launch, download and run the matching Inno Setup installer (`Shima-Setup-<version>-win-x64.exe` or `Shima-Setup-<version>-win-arm64.exe`):
+
+1. Run `Shima-Setup-<version>-<rid>.exe` and follow the guided wizard (installs to `Program Files\Shima` with Start Menu and optional Desktop shortcuts).
+2. During setup on Windows 10 2004+ / Windows 11, the installer automatically prepares the embedded Sparse MSIX certificate (if self-signed) and registers `Shima.Identity-<rid>.msix` for your logged-in Windows user account.
+3. Keep **"Launch Shima"** checked on the finish screen — Shima starts immediately with Windows package identity active so the Notification Inbox works out of the box (older Windows builds fall back gracefully with all other widgets active).
+4. Uninstalling from Windows **Installed apps / Add or Remove Programs** cleanly stops Shima and unregisters the Sparse MSIX identity while preserving your local data in `%LOCALAPPDATA%\Shima\`.
+
+Portable `.zip` archives and standalone `Shima.Identity-<rid>.msix` packages remain available alongside the installer for manual or portable deployments.
+
 ## Local Setup
 
 Prerequisites:
@@ -95,7 +106,7 @@ Order and milestones come from [development-roadmap.md](docs/blueprint/developme
 | 9. Developer Activity (Claude Code, OpenCode) | T049–T053 | M5 | Done |
 | 10. Packaging, signing, release verification | T054–T056 | M6 | Done |
 
-Release packaging & full soak verification (`win-x64` / `win-arm64` + Sparse MSIX; install `vpk` via `dotnet tool install -g vpk` when building Velopack `Setup.exe` delta installers):
+Release packaging & full soak verification (`win-x64` / `win-arm64` portable `.zip` + Sparse MSIX + Inno Setup `Shima-Setup-*.exe` when Inno Setup 6 is installed):
 
 ```powershell
 .\build\build-release.ps1

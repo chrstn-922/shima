@@ -8,4 +8,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Shima.Core\Shima.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\Shima.App\Assets\Shima.ico"
+                      Link="Assets\Shima.ico"
+                      LogicalName="Shima.Presentation.Assets.Shima.ico" />
+  </ItemGroup>
 </Project>

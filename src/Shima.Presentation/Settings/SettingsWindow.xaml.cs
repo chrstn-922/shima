@@ -61,6 +61,7 @@ public partial class SettingsWindow : Window
         _licenseService = licenseService;
 
         InitializeComponent();
+        Icon = BrandIconLoader.TryLoadWindowIcon();
 
         _themeRenderer?.AttachFrameworkElement(this);
         _appearanceManager.AppearanceChanged += OnAppearanceChanged;

@@ -75,6 +75,15 @@ public sealed class ReleaseAndPackagingTests
         AssertPngDimensions(Path.Combine(repoRoot, "build", "sparse-msix", "Assets", "StoreLogo.png"), 50, 50);
         AssertPngDimensions(Path.Combine(repoRoot, "build", "sparse-msix", "Assets", "Square44x44Logo.png"), 44, 44);
         AssertPngDimensions(Path.Combine(repoRoot, "build", "sparse-msix", "Assets", "Square150x150Logo.png"), 150, 150);
+
+        // Verify source brand SVG and multi-size PNG-compressed Shima.ico frames (16, 24, 32, 48, 64, 256)
+        File.Exists(Path.Combine(repoRoot, "assets", "branding", "shima-cradled-island.svg")).Should().BeTrue();
+        AssertMultiSizePngIco(
+            Path.Combine(repoRoot, "src", "Shima.App", "Assets", "Shima.ico"),
+            [16, 24, 32, 48, 64, 256]);
+
+        var appCsproj = File.ReadAllText(Path.Combine(repoRoot, "src", "Shima.App", "Shima.App.csproj"));
+        appCsproj.Should().Contain("<ApplicationIcon>Assets\\Shima.ico</ApplicationIcon>");
     }
 
     [Fact]
@@ -84,6 +93,7 @@ public sealed class ReleaseAndPackagingTests
         var buildDir = Path.Combine(repoRoot, "build");
         foreach (var scriptName in new[]
                  {
+                     "generate-brand-icons.ps1",
                      "register-sparse-identity.ps1",
                      "sign-artifacts.ps1",
                      "build-release.ps1",
@@ -94,6 +104,33 @@ public sealed class ReleaseAndPackagingTests
             File.Exists(scriptPath).Should().BeTrue($"build script {scriptName} must exist");
             File.ReadAllText(scriptPath).Length.Should().BeGreaterThan(200);
         }
+
+        var innoScriptPath = Path.Combine(buildDir, "installer", "shima.iss");
+        File.Exists(innoScriptPath).Should().BeTrue("Inno Setup installer script must exist");
+        var innoScript = File.ReadAllText(innoScriptPath);
+        innoScript.Should().Contain("#define AppVersion");
+        innoScript.Should().Contain("#define Rid");
+        innoScript.Should().Contain("#define SourceDir");
+        innoScript.Should().Contain("#define OutputDir");
+        innoScript.Should().Contain("SetupIconFile=");
+        innoScript.Should().Contain("UninstallDisplayIcon={app}\\{#AppExeName}");
+        innoScript.Should().Contain("x64compatible");
+        innoScript.Should().Contain("arm64");
+        innoScript.Should().Contain("PrivilegesRequired=admin");
+        innoScript.Should().Contain("-TrustEmbeddedCert");
+        innoScript.Should().Contain("runasoriginaluser runhidden waituntilterminated");
+        innoScript.Should().Contain("nowait postinstall skipifsilent runasoriginaluser");
+        innoScript.Should().Contain("-Unregister");
+
+        var registerScript = File.ReadAllText(Path.Combine(buildDir, "register-sparse-identity.ps1"));
+        registerScript.Should().Contain("$TrustEmbeddedCert");
+        registerScript.Should().Contain("$Unregister");
+        registerScript.Should().Contain("TrustedPeople");
+
+        var buildScript = File.ReadAllText(Path.Combine(buildDir, "build-release.ps1"));
+        buildScript.Should().Contain("ISCC.exe");
+        buildScript.Should().Contain("shima.iss");
+        buildScript.Should().Contain("installerSha256");
 
         var srcRoot = Path.Combine(repoRoot, "src");
         foreach (var file in Directory.EnumerateFiles(srcRoot, "*.*", SearchOption.AllDirectories))
@@ -119,6 +156,45 @@ public sealed class ReleaseAndPackagingTests
                     $"Hardcoded hex literal found in XAML outside ThemeTokens.xaml: {Path.GetRelativePath(repoRoot, file)}");
             }
         }
+    }
+
+    private static void AssertMultiSizePngIco(string filePath, int[] expectedSizes)
+    {
+        File.Exists(filePath).Should().BeTrue($"icon '{filePath}' must exist");
+        var bytes = File.ReadAllBytes(filePath);
+        bytes.Length.Should().BeGreaterThan(6 + (16 * expectedSizes.Length));
+
+        BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(0, 2)).Should().Be(0);
+        BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(2, 2)).Should().Be(1);
+        var count = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(4, 2));
+        count.Should().Be((ushort)expectedSizes.Length);
+
+        var actualSizes = new List<int>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var entryOffset = 6 + (i * 16);
+            var rawWidth = bytes[entryOffset];
+            var rawHeight = bytes[entryOffset + 1];
+            var expectedWidth = rawWidth == 0 ? 256 : rawWidth;
+            var expectedHeight = rawHeight == 0 ? 256 : rawHeight;
+            expectedWidth.Should().Be(expectedHeight);
+
+            var dataLength = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(entryOffset + 8, 4));
+            var dataOffset = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(entryOffset + 12, 4));
+            dataOffset.Should().BeGreaterOrEqualTo(6 + (count * 16));
+            (dataOffset + dataLength).Should().BeLessOrEqualTo(bytes.Length);
+
+            var payload = bytes.AsSpan(dataOffset, dataLength);
+            payload.Length.Should().BeGreaterOrEqualTo(24);
+            payload[..8].SequenceEqual(PngSignature).Should().BeTrue("each ICO frame must be PNG-compressed");
+            var pngWidth = BinaryPrimitives.ReadInt32BigEndian(payload.Slice(16, 4));
+            var pngHeight = BinaryPrimitives.ReadInt32BigEndian(payload.Slice(20, 4));
+            pngWidth.Should().Be(expectedWidth);
+            pngHeight.Should().Be(expectedHeight);
+            actualSizes.Add(pngWidth);
+        }
+
+        actualSizes.Should().Equal(expectedSizes);
     }
 
     private static void AssertPngDimensions(string filePath, int expectedWidth, int expectedHeight)

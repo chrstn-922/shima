@@ -44,7 +44,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="8" />
+            <RowDefinition Height="6" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -81,23 +81,26 @@
                     BorderBrush="{DynamicResource WarningBannerBorder}"
                     BorderThickness="1"
                     CornerRadius="10"
-                    Padding="12"
+                    Padding="10,8"
                     VerticalAlignment="Center"
                     AutomationProperties.AutomationId="InboxAccessGuidanceCard">
                 <StackPanel>
                     <TextBlock Text="{Binding AccessGuidanceTitle}"
                                FontFamily="{DynamicResource ShimaFontFamily}"
-                               FontSize="12.5"
+                               FontSize="12"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource WarningBannerText}" />
                     <TextBlock Text="{Binding AccessGuidanceMessage}"
-                               Margin="0,4,0,8"
+                               Margin="0,3,0,7"
                                FontFamily="{DynamicResource ShimaFontFamily}"
-                               FontSize="11"
+                               FontSize="10.5"
+                               LineHeight="14"
+                               LineStackingStrategy="BlockLineHeight"
                                Foreground="{DynamicResource TextMuted}"
                                TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource InboxActionButtonStyle}"
+                                Padding="8,2.5"
                                 Content="Open Windows Settings"
                                 Margin="0,0,6,0"
                                 Visibility="{Binding ShowOpenWindowsSettingsButton, Converter={StaticResource BoolToVis}}"
@@ -105,6 +108,7 @@
                                 AutomationProperties.Name="Open Windows Notification Settings"
                                 AutomationProperties.AutomationId="InboxOpenWindowsSettingsButton" />
                         <Button Style="{StaticResource InboxActionButtonStyle}"
+                                Padding="8,2.5"
                                 Content="Grant access"
                                 Margin="0,0,6,0"
                                 Visibility="{Binding ShowRequestAccessButton, Converter={StaticResource BoolToVis}}"
@@ -112,6 +116,7 @@
                                 AutomationProperties.Name="Grant notification access"
                                 AutomationProperties.AutomationId="InboxGrantAccessButton" />
                         <Button Style="{StaticResource InboxActionButtonStyle}"
+                                Padding="8,2.5"
                                 Content="Retry"
                                 Click="OnRetryClicked"
                                 AutomationProperties.Name="Retry notification access check"

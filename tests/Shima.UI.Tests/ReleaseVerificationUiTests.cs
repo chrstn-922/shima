@@ -86,6 +86,8 @@ public sealed class ReleaseVerificationUiTests
 
             await host.PumpAsync();
 
+            (await host.RunAsync(() => window.Icon)).Should().NotBeNull("SettingsWindow must load Shima's brand icon");
+
             // 1. Verify Updates panel offline mode check
             var (installedText, updateStatusText, checkUpdatesButton) = await host.RunAsync(() =>
             {
@@ -173,13 +175,13 @@ public sealed class ReleaseVerificationUiTests
         foreach (var bounds in new[] { primaryBounds, secondaryBounds })
         {
             var collapsed = OverlayWindowAdapter.CalculateAnchoredPixelRect(bounds, dpiScale, new DipSize(136, 28));
-            var expanded = OverlayWindowAdapter.CalculateAnchoredPixelRect(bounds, dpiScale, new DipSize(412, 168));
+            var expanded = OverlayWindowAdapter.CalculateAnchoredPixelRect(bounds, dpiScale, new DipSize(444, 176));
 
             collapsed.Top.Should().Be(bounds.Top);
             expanded.Top.Should().Be(bounds.Top);
 
             collapsed.Width.Should().Be((int)Math.Round(136 * dpiScale, MidpointRounding.AwayFromZero));
-            expanded.Width.Should().Be((int)Math.Round(412 * dpiScale, MidpointRounding.AwayFromZero));
+            expanded.Width.Should().Be((int)Math.Round(444 * dpiScale, MidpointRounding.AwayFromZero));
 
             collapsed.Left.Should().BeGreaterOrEqualTo(bounds.Left);
             expanded.Left.Should().BeGreaterOrEqualTo(bounds.Left);
