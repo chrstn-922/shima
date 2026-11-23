@@ -545,6 +545,9 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         var installed = await pluginAdapter.InstallPluginAsync();
         installed.Success.Should().BeTrue();
         pluginAdapter.IsPluginInstalled().Should().BeTrue();
+        var pluginSource = await File.ReadAllTextAsync(pluginPath);
+        pluginSource.Should().Contain("id: \"shima-bridge\"");
+        pluginSource.Should().Contain("async setup(ctx)");
         var uninstalled = await pluginAdapter.UninstallPluginAsync();
         uninstalled.Success.Should().BeTrue();
         pluginAdapter.IsPluginInstalled().Should().BeFalse();
@@ -676,6 +679,115 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         openCode.PurgeInactiveSessions(now.AddMinutes(5)).Should().Be(0);
         now = now.AddMinutes(16);
         openCode.PurgeInactiveSessions(now).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task OpenCodeAdapter_V2NamedPipeEvents_ParseDataEnvelope_AllLifecycleStates_AndSurviveHttp401()
+    {
+        var now = new DateTimeOffset(2026, 11, 22, 22, 0, 0, TimeSpan.Zero);
+        var handler = new ScriptedHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        var prefs = new FakeAppPreferencesService(new AppPreferencesSnapshot
+        {
+            OpenCodeOptInEnabled = true,
+            OpenCodeEndpointUrl = "http://127.0.0.1:4096"
+        });
+
+        var pluginPath = Path.Combine(_tempRoot, "v2-pipe", "plugins", "shima-bridge.ts");
+        var pipeName = $"shima-oc-v2-{Guid.NewGuid():N}";
+        await using var adapter = new OpenCodeAdapter(
+            prefs,
+            logger: null,
+            handler,
+            delayProvider: (_, _) => Task.CompletedTask,
+            utcNowProvider: () => now,
+            pluginFilePath: pluginPath,
+            pluginPipeName: pipeName);
+
+        // Install plugin and verify backup appends .bak on reinstall so OpenCode v2 never auto-loads backups
+        var firstInstall = await adapter.InstallPluginAsync();
+        firstInstall.Success.Should().BeTrue();
+        var reinstall = await adapter.InstallPluginAsync();
+        reinstall.Success.Should().BeTrue();
+        reinstall.BackupPath.Should().NotBeNullOrWhiteSpace();
+        reinstall.BackupPath!.EndsWith(".bak", StringComparison.OrdinalIgnoreCase).Should().BeTrue();
+
+        var updates = new ConcurrentQueue<AgentSessionSnapshot>();
+        adapter.SessionUpdated += (_, snap) => updates.Enqueue(snap);
+
+        await adapter.StartAsync();
+
+        // Give HTTP loop a moment to receive 401 Unauthorized first, then verify named pipe still accepts v2 events
+        await Task.Delay(60);
+
+        async Task SendPipeLineAsync(string jsonLine)
+        {
+            await using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await client.ConnectAsync(3000);
+            await using var writer = new StreamWriter(client, new UTF8Encoding(false), leaveOpen: true) { AutoFlush = true };
+            await writer.WriteLineAsync(jsonLine);
+        }
+
+        await SendPipeLineAsync("""{"kind":"handshake","supportsInteractivePermissionHook":false}""");
+        await WaitUntilAsync(() => adapter.IsPluginBridgeActive && adapter.ConnectionState == AgentConnectionState.Connected);
+
+        // Health check hitting HTTP 401 must keep plugin bridge Healthy and Connected (never disconnect plugin sessions)
+        var healthWhile401 = await adapter.CheckHealthAsync();
+        healthWhile401.Status.Should().Be(AdapterHealthStatus.Healthy);
+        healthWhile401.Message.Should().Contain("Plugin bridge active");
+        adapter.ConnectionState.Should().Be(AgentConnectionState.Connected);
+
+        // 1. OpenCode v2 session.created uses "data" envelope + nested location.directory
+        await SendPipeLineAsync("""{"id":"evt_1","type":"session.created","created":1763820000000,"data":{"sessionID":"ses_v2","location":{"directory":"C:\\repos\\shima"},"title":"Fix island bridge"}}""");
+        await WaitUntilAsync(() => updates.Any(s => s.SessionId == "opencode:ses_v2" && s.TaskSummary == "Fix island bridge"));
+        updates.Last().Should().Match<AgentSessionSnapshot>(s =>
+            s.SessionId == "opencode:ses_v2"
+            && s.WorkspaceName == "shima"
+            && s.WorkspacePath == @"C:\repos\shima"
+            && s.Status == AgentStatus.Working
+            && s.ConnectionState == AgentConnectionState.Connected);
+
+        // 2. High-frequency deltas & global catalog events are quietly skipped (never counted as ambiguous)
+        await SendPipeLineAsync("""{"id":"evt_delta","type":"session.text.delta","created":1763820001000,"data":{"sessionID":"ses_v2","delta":"hi"}}""");
+        await SendPipeLineAsync("""{"id":"evt_model","type":"model.updated","created":1763820001100,"data":{}}""");
+
+        // 3. OpenCode v2 tool start -> Working with tool name
+        await SendPipeLineAsync("""{"id":"evt_2","type":"session.tool.input.started","created":1763820002000,"data":{"sessionID":"ses_v2","assistantMessageID":"msg_1","id":"call_1","name":"shell"}}""");
+        await WaitUntilAsync(() => updates.Any(s => s.SessionId == "opencode:ses_v2" && s.TaskSummary == "Running shell"));
+        adapter.AmbiguousEventsIgnoredCount.Should().Be(0);
+
+        // 4. OpenCode v2 permission.asked uses action + resources array
+        await SendPipeLineAsync("""{"id":"evt_3","type":"permission.asked","created":1763820003000,"data":{"id":"per_1","sessionID":"ses_v2","action":"shell","resources":["dotnet test"]}}""");
+        await WaitUntilAsync(() => updates.Any(s => s.SessionId == "opencode:ses_v2" && s.Status == AgentStatus.AwaitingApproval));
+        updates.Last().Should().Match<AgentSessionSnapshot>(s =>
+            s.Status == AgentStatus.AwaitingApproval
+            && s.PendingRequestId == "per_1"
+            && s.PendingToolName == "shell"
+            && s.PendingActionSummary == "dotnet test");
+
+        // 5. OpenCode v2 permission.replied clears approval -> Working
+        await SendPipeLineAsync("""{"id":"evt_4","type":"permission.replied","created":1763820004000,"data":{"sessionID":"ses_v2","requestID":"per_1","reply":"once"}}""");
+        await WaitUntilAsync(() => updates.Last().Status == AgentStatus.Working && updates.Last().PendingRequestId == null);
+
+        // 6. OpenCode v2 session.execution.succeeded -> Finished
+        await SendPipeLineAsync("""{"id":"evt_5","type":"session.execution.succeeded","created":1763820005000,"data":{"sessionID":"ses_v2"}}""");
+        await WaitUntilAsync(() => updates.Last().Status == AgentStatus.Finished);
+
+        // 7. Duplicate of evt_5 from a second plugin supervisor is deduplicated; new turn evt_6 transitions back to Working
+        await SendPipeLineAsync("""{"id":"evt_5","type":"session.execution.succeeded","created":1763820005000,"data":{"sessionID":"ses_v2"}}""");
+        await SendPipeLineAsync("""{"id":"evt_6","type":"session.execution.started","created":1763820006000,"directory":"C:\\repos\\shima","sessionTitle":"Second turn","data":{"sessionID":"ses_v2"}}""");
+        await WaitUntilAsync(() => updates.Last().Status == AgentStatus.Working && updates.Last().TaskSummary == "Second turn");
+        adapter.DuplicateEventsIgnoredCount.Should().BeGreaterThanOrEqualTo(1);
+
+        // 8. OpenCode v2 session.execution.failed -> NeedsAttention (fatal) with error message
+        await SendPipeLineAsync("""{"id":"evt_7","type":"session.execution.failed","created":1763820007000,"data":{"sessionID":"ses_v2","error":{"type":"api","message":"Provider rate limit"}}}""");
+        await WaitUntilAsync(() => updates.Last().Status == AgentStatus.NeedsAttention && updates.Last().TaskSummary == "Provider rate limit");
+        updates.Last().IsFatalError.Should().BeTrue();
+
+        // 9. Repeated HTTP 401 health check must NEVER override tracked named-pipe sessions to Disconnected
+        var postEventsHealth = await adapter.CheckHealthAsync();
+        postEventsHealth.Status.Should().Be(AdapterHealthStatus.Healthy);
+        adapter.ConnectionState.Should().Be(AgentConnectionState.Connected);
+        updates.Last().ConnectionState.Should().Be(AgentConnectionState.Connected);
     }
 
     [Fact]

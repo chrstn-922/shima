@@ -152,6 +152,8 @@ public partial class App : Application
 
             object? cachedCompactView = null;
             string? cachedCompactWidgetId = null;
+            object? cachedCompanionView = null;
+            string? cachedCompanionWidgetId = null;
 
             void SyncCompactActiveView()
             {
@@ -160,7 +162,10 @@ public partial class App : Application
                 {
                     cachedCompactWidgetId = null;
                     cachedCompactView = null;
+                    cachedCompanionWidgetId = null;
+                    cachedCompanionView = null;
                     islandWindow.SetCompactActiveContent(null);
+                    islandWindow.SetCompactCompanionContent(null);
                     return;
                 }
 
@@ -170,7 +175,20 @@ public partial class App : Application
                     cachedCompactView = widgetRegistry.CreateCompactActiveView(widgetId);
                 }
 
+                var companionWidgetId = stateManager.CompactCompanionWidgetId;
+                if (string.IsNullOrWhiteSpace(companionWidgetId))
+                {
+                    cachedCompanionWidgetId = null;
+                    cachedCompanionView = null;
+                }
+                else if (!string.Equals(cachedCompanionWidgetId, companionWidgetId, StringComparison.Ordinal))
+                {
+                    cachedCompanionWidgetId = companionWidgetId;
+                    cachedCompanionView = widgetRegistry.CreateCompactCompanionView(companionWidgetId);
+                }
+
                 islandWindow.SetCompactActiveContent(cachedCompactView);
+                islandWindow.SetCompactCompanionContent(cachedCompanionView);
             }
 
             SyncCompactActiveView();
@@ -244,6 +262,8 @@ public partial class App : Application
                 {
                     cachedCompactWidgetId = null;
                     cachedCompactView = null;
+                    cachedCompanionWidgetId = null;
+                    cachedCompanionView = null;
                     SyncIslandWidgetSlots(islandWindow, widgetRegistry);
                     SyncCompactActiveView();
                     SyncCollapsedStatusView();

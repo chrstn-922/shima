@@ -318,6 +318,32 @@ public sealed class WidgetRegistry : IAsyncDisposable
         }
     }
 
+    public object? CreateCompactCompanionView(string widgetId)
+    {
+        var entry = GetEntry(widgetId);
+        var instance = entry.Instance;
+        if (instance is not ICompactCompanionViewProvider provider || entry.IsFaulted)
+        {
+            return null;
+        }
+
+        var config = entry.Config;
+        if (config is not null && !config.IsEnabled)
+        {
+            return null;
+        }
+
+        try
+        {
+            return provider.CreateCompactCompanionView();
+        }
+        catch (Exception exception)
+        {
+            MarkFaulted(entry, nameof(ICompactCompanionViewProvider.CreateCompactCompanionView), exception);
+            return null;
+        }
+    }
+
     public string? ResolveAutoSelectWidgetIdOnExpand()
     {
         foreach (var entry in SnapshotEntries().OrderBy(e => e.Config?.SortOrder ?? e.Registration.Metadata.DefaultOrder))

@@ -714,6 +714,89 @@ public sealed class ProductivityWidgetsTests
             new OsNotificationDto(4, "com.git", "Git", "PR merged", "Merged main", null, now.AddSeconds(3)));
         await module.ViewModel.HandleNotificationRemovedExternallyAsync(4u);
         module.ViewModel.TotalActiveCount.Should().Be(0);
+        await module.ViewModel.WaitForPendingWorkAsync();
+        module.ViewModel.TotalActiveCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task InboxWidgetModule_PreferencesChangedConcurrentWithDismissal_NeverRestoresStaleCount()
+    {
+        var now = new DateTimeOffset(2026, 11, 22, 11, 15, 0, TimeSpan.Zero);
+        var backend = new FakeNotificationNativeBackend { AccessState = NotificationAccessState.Allowed };
+        using var adapter = new NotificationListenerAdapter(backend);
+        var repo = new YieldingInboxRepository(new InMemoryInboxRepository());
+        var prefs = new FakeAppPreferencesService(new AppPreferencesSnapshot
+        {
+            SyncInboxDismissalWithActionCenter = true,
+            InboxRetentionDays = 14
+        });
+
+        var pinController = new OverlayPinController();
+        using var stateManager = new IslandStateManager(pinController);
+        var requester = new IslandAttentionRequester(stateManager);
+        var events = new InMemoryEventDispatcher();
+
+        await using var module = new InboxWidgetModule(adapter, repo, prefs, utcNowProvider: () => now);
+        await module.InitializeAsync(CreateContext(InboxWidgetModule.Id, events, requester), CancellationToken.None);
+
+        // Hammer concurrent preferences updates against arrivals and both local & external dismissals
+        for (var iteration = 0; iteration < 25; iteration++)
+        {
+            var toastId = (uint)(100 + iteration);
+            await module.ViewModel.HandleNotificationArrivedAsync(
+                new OsNotificationDto(toastId, "com.git", "Git", $"Build {iteration}", "Completed", null, now.AddSeconds(iteration)),
+                allowPeek: false);
+
+            var prefTask = Task.Run(() =>
+            {
+                prefs.Update(prefs.Current with
+                {
+                    InboxRetentionDays = iteration % 2 == 0 ? 7 : 14,
+                    SyncInboxDismissalWithActionCenter = true
+                });
+            });
+
+            if (iteration % 2 == 0)
+            {
+                await module.ViewModel.HandleNotificationRemovedExternallyAsync(toastId);
+            }
+            else
+            {
+                var itemId = module.ViewModel.AppGroups.Single().Items.Single().NotificationId;
+                await module.ViewModel.DismissNotificationAsync(itemId);
+            }
+
+            await prefTask;
+            await module.ViewModel.WaitForPendingWorkAsync();
+            module.ViewModel.TotalActiveCount.Should().Be(0);
+        }
+
+        // Verify out-of-order delayed UI dispatcher callbacks cannot overwrite newer dismissal state
+        var queuedUiActions = new List<Action>();
+        module.ViewModel.AttachUiDispatcher(action => queuedUiActions.Add(action));
+
+        await module.ViewModel.HandleNotificationArrivedAsync(
+            new OsNotificationDto(999, "com.git", "Git", "Queued stale", "Body", null, now.AddMinutes(5)),
+            allowPeek: false);
+        prefs.Update(prefs.Current with { InboxRetentionDays = 21 });
+        await module.ViewModel.WaitForPendingWorkAsync();
+
+        var itemToDismiss = queuedUiActions.Last(); // Arrival / pref queued total = 1
+        itemToDismiss();
+        var latestItemId = module.ViewModel.AppGroups.Single().Items.Single().NotificationId;
+        await module.ViewModel.DismissNotificationAsync(latestItemId);
+
+        // Execute newer dismissal callback FIRST, then replay ALL older queued callbacks
+        var latestAction = queuedUiActions[^1];
+        latestAction();
+        module.ViewModel.TotalActiveCount.Should().Be(0);
+
+        for (var i = 0; i < queuedUiActions.Count - 1; i++)
+        {
+            queuedUiActions[i]();
+        }
+
+        module.ViewModel.TotalActiveCount.Should().Be(0);
     }
 
     [Fact]
@@ -1324,6 +1407,59 @@ public sealed class ProductivityWidgetsTests
 
             return Path.Combine(_dataRoot, relativePath);
         }
+    }
+
+    private sealed class YieldingInboxRepository(IInboxRepository inner) : IInboxRepository
+    {
+        public async Task<IReadOnlyList<InboxAppGroup>> GetGroupedByAppAsync(
+            bool includeDismissed = false,
+            CancellationToken ct = default)
+        {
+            await Task.Yield();
+            return await inner.GetGroupedByAppAsync(includeDismissed, ct).ConfigureAwait(false);
+        }
+
+        public Task<IReadOnlyList<InboxNotificationItem>> GetAllActiveAsync(CancellationToken ct = default) =>
+            inner.GetAllActiveAsync(ct);
+
+        public Task<InboxNotificationItem> UpsertToastAsync(InboxNotificationItem item, CancellationToken ct = default) =>
+            inner.UpsertToastAsync(item, ct);
+
+        public Task<InboxNotificationItem?> FindByOsToastIdAsync(uint osToastId, CancellationToken ct = default) =>
+            inner.FindByOsToastIdAsync(osToastId, ct);
+
+        public async Task MarkDismissedAsync(string notificationId, CancellationToken ct = default)
+        {
+            await Task.Yield();
+            await inner.MarkDismissedAsync(notificationId, ct).ConfigureAwait(false);
+        }
+
+        public async Task MarkDismissedByOsToastIdAsync(uint osToastId, CancellationToken ct = default)
+        {
+            await Task.Yield();
+            await inner.MarkDismissedByOsToastIdAsync(osToastId, ct).ConfigureAwait(false);
+        }
+
+        public Task<IReadOnlyList<uint>> ClearAppGroupAsync(string appId, CancellationToken ct = default) =>
+            inner.ClearAppGroupAsync(appId, ct);
+
+        public Task<IReadOnlyList<uint>> ClearAllAsync(CancellationToken ct = default) =>
+            inner.ClearAllAsync(ct);
+
+        public async Task<int> PruneExpiredAsync(
+            int retentionDays = 14,
+            int maxStoredItems = 500,
+            DateTimeOffset? utcNow = null,
+            CancellationToken ct = default)
+        {
+            await Task.Yield();
+            return await inner.PruneExpiredAsync(retentionDays, maxStoredItems, utcNow, ct).ConfigureAwait(false);
+        }
+
+        public Task<string?> SaveAppIconAssetAsync(string appId, byte[] pngBytes, CancellationToken ct = default) =>
+            inner.SaveAppIconAssetAsync(appId, pngBytes, ct);
+
+        public string? ResolveIconFullPath(string? relativePath) => inner.ResolveIconFullPath(relativePath);
     }
 
     private sealed class InMemoryInboxRepository : IInboxRepository

@@ -61,12 +61,17 @@
                    Foreground="{DynamicResource TextPrimary}"
                    TextTrimming="CharacterEllipsis" />
 
-        <Ellipse Grid.Column="2"
-                 Width="6"
-                 Height="6"
-                 Margin="8,0,0,0"
-                 VerticalAlignment="Center"
-                 Fill="{DynamicResource AccentBrush}"
-                 Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}" />
+        <Grid x:Name="TrailingDotSlot"
+              Grid.Column="2"
+              VerticalAlignment="Center"
+              Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVis}}">
+            <Ellipse x:Name="PlayingAccentDot"
+                     Width="6"
+                     Height="6"
+                     Margin="8,0,0,0"
+                     VerticalAlignment="Center"
+                     Fill="{DynamicResource AccentBrush}"
+                     AutomationProperties.AutomationId="NowPlayingCompactAccentDot" />
+        </Grid>
     </Grid>
 </UserControl>

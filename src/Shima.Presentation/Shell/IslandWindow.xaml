@@ -104,8 +104,32 @@
                            AutomationProperties.Name="Active pill status" />
             </StackPanel>
 
-            <ContentPresenter x:Name="ActiveCustomContentPresenter"
-                              Visibility="Collapsed" />
+            <Grid x:Name="ActiveCustomContentHost"
+                  Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter x:Name="ActiveCustomContentPresenter"
+                                  Grid.Column="0"
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed" />
+
+                <Border x:Name="ActiveCompanionHost"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right"
+                        Width="0"
+                        Opacity="0"
+                        ClipToBounds="True"
+                        Visibility="Collapsed"
+                        AutomationProperties.AutomationId="ActiveCompanionHost">
+                    <ContentPresenter x:Name="ActiveCompanionContentPresenter"
+                                      Margin="8,0,0,0"
+                                      VerticalAlignment="Center" />
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- Notification peek layer -->

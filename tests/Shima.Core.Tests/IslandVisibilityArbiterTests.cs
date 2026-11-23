@@ -230,4 +230,44 @@ public sealed class IslandVisibilityArbiterTests
         await FluentActions.Invoking(() => manager.TransitionToAsync(IslandShellState.Active, cts.Token))
             .Should().ThrowAsync<OperationCanceledException>();
     }
+
+    [Fact]
+    public void CompactCompanionSlot_TracksBackgroundWidgetAlongsideNormalPrimary_AndYieldsToUrgentOrIdle()
+    {
+        var pinController = new OverlayPinController();
+        using var manager = new IslandStateManager(pinController);
+        var compactEvents = 0;
+        manager.CompactPillUpdated += (_, _) => compactEvents++;
+
+        // Media playing alone -> no companion
+        manager.SetCompactActive("shima.music", isActive: true, badgeText: "Midnight City", CompactPillPriority.Normal);
+        manager.CompactActiveWidgetId.Should().Be("shima.music");
+        manager.CompactCompanionWidgetId.Should().BeNull();
+
+        // Developer activity becomes active in background -> Media remains primary, Agent becomes companion
+        var countBeforeCompanion = compactEvents;
+        manager.SetCompactActive("shima.developer", isActive: true, badgeText: "Agent working", CompactPillPriority.Background);
+        manager.CurrentState.Should().Be(IslandShellState.Active);
+        manager.CompactActiveWidgetId.Should().Be("shima.music");
+        manager.CompactCompanionWidgetId.Should().Be("shima.developer");
+        compactEvents.Should().BeGreaterThan(countBeforeCompanion);
+
+        // Developer escalates to Urgent (approval/error) -> takes full compact pill, clears companion
+        manager.SetCompactActive("shima.developer", isActive: true, badgeText: "Approval needed", CompactPillPriority.Urgent);
+        manager.CompactActiveWidgetId.Should().Be("shima.developer");
+        manager.CompactCompanionWidgetId.Should().BeNull();
+
+        // Urgent resolved back to Working (Background) -> Media primary + Agent companion restored
+        manager.SetCompactActive("shima.developer", isActive: true, badgeText: "Agent working", CompactPillPriority.Background);
+        manager.CompactActiveWidgetId.Should().Be("shima.music");
+        manager.CompactCompanionWidgetId.Should().Be("shima.developer");
+
+        // Developer goes Idle -> companion clears while Media stays active
+        var countBeforeIdle = compactEvents;
+        manager.SetCompactActive("shima.developer", isActive: false, badgeText: null, CompactPillPriority.Background);
+        manager.CurrentState.Should().Be(IslandShellState.Active);
+        manager.CompactActiveWidgetId.Should().Be("shima.music");
+        manager.CompactCompanionWidgetId.Should().BeNull();
+        compactEvents.Should().BeGreaterThan(countBeforeIdle);
+    }
 }

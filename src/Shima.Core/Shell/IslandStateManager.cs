@@ -32,6 +32,7 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
     private bool _isInputFocusActive;
     private string? _compactPillBadgeText;
     private string? _compactActiveWidgetId;
+    private string? _compactCompanionWidgetId;
     private TimeSpan _currentNotificationTtl = DefaultNotificationTtl;
     private bool _disposed;
 
@@ -152,6 +153,17 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
         }
     }
 
+    public string? CompactCompanionWidgetId
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _compactCompanionWidgetId;
+            }
+        }
+    }
+
     public TimeSpan CurrentNotificationTtl
     {
         get
@@ -268,6 +280,7 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
             var prevActive = _isCompactActive;
             var prevBadge = _compactPillBadgeText;
             var prevWidgetId = _compactActiveWidgetId;
+            var prevCompanionWidgetId = _compactCompanionWidgetId;
 
             if (isActive)
             {
@@ -287,6 +300,7 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
                 _isCompactActive = false;
                 _compactPillBadgeText = null;
                 _compactActiveWidgetId = null;
+                _compactCompanionWidgetId = null;
             }
             else
             {
@@ -298,11 +312,21 @@ public sealed class IslandStateManager : IIslandStateManager, IDisposable
                 _isCompactActive = true;
                 _compactPillBadgeText = winner.BadgeText;
                 _compactActiveWidgetId = winner.PublicWidgetId;
+                _compactCompanionWidgetId = winner.Priority == CompactPillPriority.Normal
+                    ? _compactSlots.Values
+                        .Where(slot => !string.Equals(slot.PublicWidgetId, winner.PublicWidgetId, StringComparison.Ordinal)
+                            && slot.Priority == CompactPillPriority.Background
+                            && !string.IsNullOrWhiteSpace(slot.PublicWidgetId))
+                        .OrderByDescending(slot => slot.Sequence)
+                        .Select(slot => slot.PublicWidgetId)
+                        .FirstOrDefault()
+                    : null;
             }
 
             pillChanged = prevActive != _isCompactActive
                 || !string.Equals(prevBadge, _compactPillBadgeText, StringComparison.Ordinal)
-                || !string.Equals(prevWidgetId, _compactActiveWidgetId, StringComparison.Ordinal);
+                || !string.Equals(prevWidgetId, _compactActiveWidgetId, StringComparison.Ordinal)
+                || !string.Equals(prevCompanionWidgetId, _compactCompanionWidgetId, StringComparison.Ordinal);
 
             ReevaluateCore(out change);
         }

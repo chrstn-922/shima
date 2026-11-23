@@ -151,7 +151,8 @@ public sealed class ReleaseVerificationUiTests
             });
 
             await WaitUntilAsync(
-                () => prefsService.Current.HasLicenseKey,
+                () => host.RunAsync(() => licenseStateText.Text.Contains("Pro", StringComparison.Ordinal))
+                    .GetAwaiter().GetResult(),
                 () => host.PumpAsync());
 
             (await host.RunAsync(() => licenseStateText.Text)).Should().Contain("Pro").And.Contain("UI Verifier");
@@ -159,7 +160,8 @@ public sealed class ReleaseVerificationUiTests
 
             await host.RunAsync(() => InvokeButton(clearButton));
             await WaitUntilAsync(
-                () => !prefsService.Current.HasLicenseKey,
+                () => host.RunAsync(() => licenseStateText.Text.Contains("Community offline edition", StringComparison.Ordinal))
+                    .GetAwaiter().GetResult(),
                 () => host.PumpAsync());
 
             (await host.RunAsync(() => licenseStateText.Text)).Should().Contain("Community offline edition");

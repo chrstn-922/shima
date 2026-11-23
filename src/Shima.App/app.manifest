@@ -23,9 +23,4 @@
       <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
     </windowsSettings>
   </application>
-
-  <msix xmlns="urn:schemas-microsoft-com:msix.v1"
-        publisher="CN=Shima"
-        packageName="Shima.DesktopCompanion"
-        applicationId="ShimaApp" />
 </assembly>

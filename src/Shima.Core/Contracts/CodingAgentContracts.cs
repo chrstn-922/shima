@@ -179,6 +179,24 @@ public interface ICollapsedStatusViewProvider
 }
 
 /// <summary>
+/// Optional widget capability exposing a compact companion indicator rendered alongside
+/// another primary compact pill (for example, active coding agent progress while media plays).
+/// </summary>
+public interface ICompactCompanionViewProvider
+{
+    object? CreateCompactCompanionView();
+}
+
+/// <summary>
+/// Optional contract implemented by primary compact views that adjust their trailing status indicator
+/// when a companion pill occupies the right side of the active compact bar.
+/// </summary>
+public interface ICompactCompanionAware
+{
+    void SetCompanionActive(bool isActive);
+}
+
+/// <summary>
 /// Optional widget capability indicating whether expanding the island should auto-select this widget
 /// and receiving hover notifications when the user hovers the collapsed notch.
 /// </summary>

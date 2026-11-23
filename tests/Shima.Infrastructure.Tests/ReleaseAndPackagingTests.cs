@@ -18,9 +18,11 @@ public sealed class ReleaseAndPackagingTests
         var repoRoot = FindRepoRoot();
         var appxPath = Path.Combine(repoRoot, "build", "sparse-msix", "AppxManifest.xml");
         var appManifestPath = Path.Combine(repoRoot, "src", "Shima.App", "app.manifest");
+        var sparseAppManifestPath = Path.Combine(repoRoot, "src", "Shima.App", "app.sparse.manifest");
 
         File.Exists(appxPath).Should().BeTrue();
         File.Exists(appManifestPath).Should().BeTrue();
+        File.Exists(sparseAppManifestPath).Should().BeTrue();
 
         var appxDoc = XDocument.Load(appxPath);
         XNamespace pkgNs = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
@@ -54,21 +56,29 @@ public sealed class ReleaseAndPackagingTests
         capabilities.Elements(uap3Ns + "Capability").Select(e => e.Attribute("Name")!.Value)
             .Should().Contain("userNotificationListener");
 
-        // Verify matching external-location <msix> binding & PerMonitorV2 in Shima.App\app.manifest
+        // Verify default unpackaged Shima.App\app.manifest omits <msix> (so dotnet run & portable .zip avoid Win32 error 15700)
         var appManifestDoc = XDocument.Load(appManifestPath);
         XNamespace msixNs = "urn:schemas-microsoft-com:msix.v1";
         XNamespace asmV3Ns = "urn:schemas-microsoft-com:asm.v3";
         XNamespace smi16Ns = "http://schemas.microsoft.com/SMI/2016/WindowsSettings";
 
-        var msixElement = appManifestDoc.Root!.Element(msixNs + "msix");
+        appManifestDoc.Root!.Element(msixNs + "msix").Should().BeNull();
+        appManifestDoc.Descendants(smi16Ns + "dpiAwareness").Single().Value
+            .Should().Contain("PerMonitorV2");
+        appManifestDoc.Descendants(asmV3Ns + "requestedExecutionLevel").Single()
+            .Attribute("level")!.Value.Should().Be("asInvoker");
+
+        // Verify matching external-location <msix> binding & PerMonitorV2 in Shima.App\app.sparse.manifest
+        var sparseManifestDoc = XDocument.Load(sparseAppManifestPath);
+        var msixElement = sparseManifestDoc.Root!.Element(msixNs + "msix");
         msixElement.Should().NotBeNull();
         msixElement!.Attribute("packageName")!.Value.Should().Be(packageName);
         msixElement.Attribute("publisher")!.Value.Should().Be(publisher);
         msixElement.Attribute("applicationId")!.Value.Should().Be(appId);
 
-        appManifestDoc.Descendants(smi16Ns + "dpiAwareness").Single().Value
+        sparseManifestDoc.Descendants(smi16Ns + "dpiAwareness").Single().Value
             .Should().Contain("PerMonitorV2");
-        appManifestDoc.Descendants(asmV3Ns + "requestedExecutionLevel").Single()
+        sparseManifestDoc.Descendants(asmV3Ns + "requestedExecutionLevel").Single()
             .Attribute("level")!.Value.Should().Be("asInvoker");
 
         // Verify exact PNG dimensions for all Sparse MSIX assets including Win11 taskbar targetsize & unplated variants
@@ -95,6 +105,8 @@ public sealed class ReleaseAndPackagingTests
 
         var appCsproj = File.ReadAllText(Path.Combine(repoRoot, "src", "Shima.App", "Shima.App.csproj"));
         appCsproj.Should().Contain("<ApplicationIcon>Assets\\Shima.ico</ApplicationIcon>");
+        appCsproj.Should().Contain("UseSparsePackageManifest");
+        appCsproj.Should().Contain("app.sparse.manifest");
     }
 
     [Fact]
@@ -154,6 +166,8 @@ public sealed class ReleaseAndPackagingTests
         buildScript.Should().Contain("resources.pri");
         buildScript.Should().Contain("$publishAssetsDir");
         buildScript.Should().Contain("Assets\\*.png");
+        buildScript.Should().Contain("UseSparsePackageManifest=false");
+        buildScript.Should().Contain("UseSparsePackageManifest=true");
 
         var workflowPath = Path.Combine(repoRoot, ".github", "workflows", "release.yml");
         File.Exists(workflowPath).Should().BeTrue("GitHub release workflow must exist");

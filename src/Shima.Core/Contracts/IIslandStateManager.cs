@@ -41,6 +41,8 @@ public interface IIslandStateManager
 
     string? CompactActiveWidgetId { get; }
 
+    string? CompactCompanionWidgetId => null;
+
     TimeSpan CurrentNotificationTtl { get; }
 
     event EventHandler<IslandStateChangedEventArgs>? StateChanged;

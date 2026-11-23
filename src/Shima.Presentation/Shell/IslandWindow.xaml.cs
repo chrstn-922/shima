@@ -50,6 +50,9 @@ public partial class IslandWindow : Window
     private IslandShellState _renderedState = IslandShellState.Collapsed;
     private IslandVisualSpec _currentVisualSpec = ConcaveNotchGeometryBuilder.CollapsedSpec;
     private long _transitionGeneration;
+    private long _companionTransitionGeneration;
+    private object? _targetCompanionContent;
+    private bool _snapNextCompanionExit;
     private nint _hwnd;
 
     public IslandWindow(
@@ -172,9 +175,154 @@ public partial class IslandWindow : Window
             return;
         }
 
+        var previousContent = ActiveCustomContentPresenter.Content;
+        var primarySwitched = previousContent is not null && !ReferenceEquals(previousContent, content);
+        if (primarySwitched)
+        {
+            _snapNextCompanionExit = true;
+        }
+
         ActiveCustomContentPresenter.Content = content;
         ActiveCustomContentPresenter.Visibility = content is not null ? Visibility.Visible : Visibility.Collapsed;
+        ActiveCustomContentHost.Visibility = content is not null ? Visibility.Visible : Visibility.Collapsed;
         ActiveDefaultBadgePanel.Visibility = content is null ? Visibility.Visible : Visibility.Collapsed;
+        NotifyPrimaryCompactCompanionChanged(_targetCompanionContent is not null);
+    }
+
+    public void SetCompactCompanionContent(object? content)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => SetCompactCompanionContent(content));
+            return;
+        }
+
+        var snapExit = _snapNextCompanionExit;
+        _snapNextCompanionExit = false;
+
+        if (ReferenceEquals(_targetCompanionContent, content))
+        {
+            NotifyPrimaryCompactCompanionChanged(content is not null);
+            return;
+        }
+
+        _targetCompanionContent = content;
+        var generation = ++_companionTransitionGeneration;
+        var canAnimate = !_powerAndMotionMonitor.IsReducedMotionEnabled && _renderedState == IslandShellState.Active;
+
+        if (content is not null)
+        {
+            var wasVisible = ActiveCompanionHost.Visibility == Visibility.Visible;
+            var fromWidth = wasVisible && ActiveCompanionHost.ActualWidth > 0
+                ? ActiveCompanionHost.ActualWidth
+                : (!double.IsNaN(ActiveCompanionHost.Width) ? ActiveCompanionHost.Width : 0.0);
+            var fromOpacity = wasVisible ? ActiveCompanionHost.Opacity : 0.0;
+
+            ActiveCompanionHost.BeginAnimation(WidthProperty, null);
+            ActiveCompanionHost.BeginAnimation(OpacityProperty, null);
+            ActiveCompanionContentPresenter.Content = content;
+            ActiveCompanionHost.Visibility = Visibility.Visible;
+            NotifyPrimaryCompactCompanionChanged(true);
+
+            ActiveCompanionContentPresenter.Measure(new Size(double.PositiveInfinity, ConcaveNotchGeometryBuilder.ActiveSpec.HeightDip));
+            var targetWidth = Math.Ceiling(ActiveCompanionContentPresenter.DesiredSize.Width);
+
+            if (!canAnimate || targetWidth <= 0)
+            {
+                ActiveCompanionHost.Width = double.NaN;
+                ActiveCompanionHost.Opacity = 1.0;
+                return;
+            }
+
+            ActiveCompanionHost.Width = fromWidth;
+            ActiveCompanionHost.Opacity = fromOpacity;
+
+            var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var widthAnim = new DoubleAnimation(fromWidth, targetWidth, TimeSpan.FromMilliseconds(200))
+            {
+                EasingFunction = easing
+            };
+            var opacityAnim = new DoubleAnimation(fromOpacity, 1.0, TimeSpan.FromMilliseconds(180))
+            {
+                EasingFunction = easing
+            };
+
+            widthAnim.Completed += (_, _) =>
+            {
+                if (_companionTransitionGeneration != generation || _targetCompanionContent is null)
+                {
+                    return;
+                }
+
+                ActiveCompanionHost.BeginAnimation(WidthProperty, null);
+                ActiveCompanionHost.BeginAnimation(OpacityProperty, null);
+                ActiveCompanionHost.Width = double.NaN;
+                ActiveCompanionHost.Opacity = 1.0;
+            };
+
+            ActiveCompanionHost.BeginAnimation(WidthProperty, widthAnim);
+            ActiveCompanionHost.BeginAnimation(OpacityProperty, opacityAnim);
+            return;
+        }
+
+        var currentVisible = ActiveCompanionHost.Visibility == Visibility.Visible;
+        var currentWidth = ActiveCompanionHost.ActualWidth > 0
+            ? ActiveCompanionHost.ActualWidth
+            : (!double.IsNaN(ActiveCompanionHost.Width) ? ActiveCompanionHost.Width : 0.0);
+
+        if (snapExit || !canAnimate || !currentVisible || currentWidth <= 0)
+        {
+            FinalizeCompanionCollapse();
+            return;
+        }
+
+        var currentOpacity = ActiveCompanionHost.Opacity;
+        ActiveCompanionHost.BeginAnimation(WidthProperty, null);
+        ActiveCompanionHost.BeginAnimation(OpacityProperty, null);
+        ActiveCompanionHost.Width = currentWidth;
+        ActiveCompanionHost.Opacity = currentOpacity;
+
+        var collapseEasing = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var collapseWidthAnim = new DoubleAnimation(currentWidth, 0.0, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = collapseEasing
+        };
+        var fadeOutAnim = new DoubleAnimation(currentOpacity, 0.0, TimeSpan.FromMilliseconds(160))
+        {
+            EasingFunction = collapseEasing
+        };
+
+        collapseWidthAnim.Completed += (_, _) =>
+        {
+            if (_companionTransitionGeneration != generation || _targetCompanionContent is not null)
+            {
+                return;
+            }
+
+            FinalizeCompanionCollapse();
+        };
+
+        ActiveCompanionHost.BeginAnimation(WidthProperty, collapseWidthAnim);
+        ActiveCompanionHost.BeginAnimation(OpacityProperty, fadeOutAnim);
+    }
+
+    private void FinalizeCompanionCollapse()
+    {
+        ActiveCompanionHost.BeginAnimation(WidthProperty, null);
+        ActiveCompanionHost.BeginAnimation(OpacityProperty, null);
+        ActiveCompanionHost.Visibility = Visibility.Collapsed;
+        ActiveCompanionHost.Width = 0.0;
+        ActiveCompanionHost.Opacity = 0.0;
+        ActiveCompanionContentPresenter.Content = null;
+        NotifyPrimaryCompactCompanionChanged(false);
+    }
+
+    private void NotifyPrimaryCompactCompanionChanged(bool isActive)
+    {
+        if (ActiveCustomContentPresenter.Content is ICompactCompanionAware aware)
+        {
+            aware.SetCompanionActive(isActive);
+        }
     }
 
     public void SetCollapsedStatusContent(object? content)
@@ -453,6 +601,24 @@ public partial class IslandWindow : Window
 
         UpdateLayerVisibility(nextState);
         ApplySurfaceGeometryAndAnchor(nextState, targetSpec);
+
+        if (nextState != IslandShellState.Active
+            && _targetCompanionContent is null
+            && ActiveCompanionHost.Visibility == Visibility.Visible)
+        {
+            ++_companionTransitionGeneration;
+            FinalizeCompanionCollapse();
+        }
+        else if (nextState == IslandShellState.Active && _targetCompanionContent is not null && reducedMotion)
+        {
+            ++_companionTransitionGeneration;
+            ActiveCompanionHost.BeginAnimation(WidthProperty, null);
+            ActiveCompanionHost.BeginAnimation(OpacityProperty, null);
+            ActiveCompanionHost.Width = double.NaN;
+            ActiveCompanionHost.Opacity = 1.0;
+            ActiveCompanionHost.Visibility = Visibility.Visible;
+            NotifyPrimaryCompactCompanionChanged(true);
+        }
 
         if (!reducedMotion && previousSpec != targetSpec)
         {

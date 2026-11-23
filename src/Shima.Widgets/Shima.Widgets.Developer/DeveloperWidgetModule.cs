@@ -9,6 +9,7 @@ namespace Shima.Widgets.Developer;
 public sealed class DeveloperWidgetModule :
     IWidgetModule,
     ICollapsedStatusViewProvider,
+    ICompactCompanionViewProvider,
     IExpandAutoSelectProvider
 {
     public const string Id = "shima.developer";
@@ -97,6 +98,8 @@ public sealed class DeveloperWidgetModule :
     public object CreateExpandedView() => new Views.DeveloperView(ViewModel);
 
     public object? CreateCompactActiveView() => new Views.DeveloperCompactView(ViewModel);
+
+    public object? CreateCompactCompanionView() => new Views.DeveloperCompactCompanionView(ViewModel);
 
     public object? CreateCollapsedStatusView() =>
         ViewModel.IsCollapsedBarVisible ? new Views.DeveloperCollapsedBarView(ViewModel) : null;

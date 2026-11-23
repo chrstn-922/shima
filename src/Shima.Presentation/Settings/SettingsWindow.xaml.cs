@@ -343,7 +343,7 @@ public partial class SettingsWindow : Window
             UpdatesOfflineModeCheck.IsChecked = prefs.UpdatesOfflineMode;
             InstalledVersionText.Text = _updateService is not null
                 ? $"Installed version: {_updateService.CurrentVersion} ({_updateService.CurrentArchitecture})"
-                : "Installed version: 1.0.0 (local-first desktop shell)";
+                : "Installed version: 1.0.1 (local-first desktop shell)";
             UpdateStatusText.Text = prefs.UpdatesOfflineMode
                 ? "Offline mode is enabled — update checks are disabled."
                 : _updateService?.StagedUpdate is { } staged

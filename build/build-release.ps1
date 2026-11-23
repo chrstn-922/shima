@@ -231,17 +231,18 @@ foreach ($rid in $Runtimes) {
     Write-Host "=== Packaging Shima $Version for $rid ($msixArch) ==="
 
     $publishDir = Join-Path $repoRoot "artifacts\publish\$rid"
-    $bridgeTempDir = Join-Path $publishDir 'bridge-tmp'
+    $installerPublishDir = Join-Path $repoRoot "artifacts\publish-installer\$rid"
+    $bridgeTempDir = Join-Path $repoRoot "artifacts\bridge-tmp\$rid"
     $releaseDir = Join-Path $releasesRoot $rid
     $sparseStageDir = Join-Path $repoRoot "artifacts\sparse-stage\$rid"
+    $appObjRidDir = Join-Path $repoRoot "src\Shima.App\obj\$Configuration\net8.0-windows10.0.22621.0\$rid"
 
-    foreach ($dir in @($publishDir, $releaseDir, $sparseStageDir)) {
+    foreach ($dir in @($publishDir, $installerPublishDir, $bridgeTempDir, $releaseDir, $sparseStageDir)) {
         if (Test-Path $dir) {
             Remove-Item -Path $dir -Recurse -Force
         }
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
-    New-Item -ItemType Directory -Force -Path $bridgeTempDir | Out-Null
 
     Write-Host "Publishing Shima.AgentBridge ($rid)..."
     dotnet publish $bridgeProject `
@@ -254,30 +255,83 @@ foreach ($rid in $Runtimes) {
         throw "dotnet publish failed for Shima.AgentBridge ($rid)."
     }
 
-    Write-Host "Publishing Shima.App ($rid)..."
+    foreach ($staleArtifact in @('apphost.exe', 'Shima.App.dll')) {
+        $stalePath = Join-Path $appObjRidDir $staleArtifact
+        if (Test-Path $stalePath) {
+            Remove-Item -Path $stalePath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Host "Publishing portable unpackaged Shima.App ($rid, UseSparsePackageManifest=false)..."
     dotnet publish $appProject `
         -c $Configuration `
         -r $rid `
         --self-contained $selfContainedFlag `
         -p:Version=$Version `
+        -p:UseSparsePackageManifest=false `
         -o $publishDir
     if ($LASTEXITCODE -ne 0) {
-        throw "dotnet publish failed for Shima.App ($rid)."
+        throw "dotnet publish failed for portable Shima.App ($rid)."
     }
 
     Copy-Item -Path (Join-Path $bridgeTempDir 'Shima.AgentBridge.*') -Destination $publishDir -Force
-    Remove-Item -Path $bridgeTempDir -Recurse -Force
 
-    if (-not (Test-Path (Join-Path $publishDir 'Shima.App.exe'))) {
-        throw "Published output missing Shima.App.exe for $rid."
+    $portableAppExe = Join-Path $publishDir 'Shima.App.exe'
+    if (-not (Test-Path $portableAppExe)) {
+        throw "Published portable output missing Shima.App.exe for $rid."
     }
     if (-not (Test-Path (Join-Path $publishDir 'Shima.AgentBridge.exe'))) {
-        throw "Published output missing Shima.AgentBridge.exe for $rid."
+        throw "Published portable output missing Shima.AgentBridge.exe for $rid."
+    }
+
+    $portableAppText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($portableAppExe))
+    if ($portableAppText.Contains('urn:schemas-microsoft-com:msix.v1')) {
+        throw "Portable Shima.App.exe for $rid unexpectedly contains an <msix> manifest element."
     }
 
     $forbiddenDrawing = Get-ChildItem -Path $publishDir -Filter 'System.Drawing.Common*.dll' -Recurse -ErrorAction SilentlyContinue
     if ($null -ne $forbiddenDrawing) {
-        throw "Forbidden System.Drawing.Common binary detected in publish output for $rid."
+        throw "Forbidden System.Drawing.Common binary detected in portable publish output for $rid."
+    }
+
+    foreach ($staleArtifact in @('apphost.exe', 'Shima.App.dll')) {
+        $stalePath = Join-Path $appObjRidDir $staleArtifact
+        if (Test-Path $stalePath) {
+            Remove-Item -Path $stalePath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Host "Publishing Sparse MSIX / installer Shima.App ($rid, UseSparsePackageManifest=true)..."
+    dotnet publish $appProject `
+        -c $Configuration `
+        -r $rid `
+        --self-contained $selfContainedFlag `
+        -p:Version=$Version `
+        -p:UseSparsePackageManifest=true `
+        -o $installerPublishDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet publish failed for installer Shima.App ($rid)."
+    }
+
+    Copy-Item -Path (Join-Path $bridgeTempDir 'Shima.AgentBridge.*') -Destination $installerPublishDir -Force
+    Remove-Item -Path $bridgeTempDir -Recurse -Force
+
+    $installerAppExe = Join-Path $installerPublishDir 'Shima.App.exe'
+    if (-not (Test-Path $installerAppExe)) {
+        throw "Published installer output missing Shima.App.exe for $rid."
+    }
+    if (-not (Test-Path (Join-Path $installerPublishDir 'Shima.AgentBridge.exe'))) {
+        throw "Published installer output missing Shima.AgentBridge.exe for $rid."
+    }
+
+    $installerAppText = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($installerAppExe))
+    if (-not $installerAppText.Contains('urn:schemas-microsoft-com:msix.v1')) {
+        throw "Installer Shima.App.exe for $rid is missing the required Sparse MSIX <msix> manifest element."
+    }
+
+    $forbiddenInstallerDrawing = Get-ChildItem -Path $installerPublishDir -Filter 'System.Drawing.Common*.dll' -Recurse -ErrorAction SilentlyContinue
+    if ($null -ne $forbiddenInstallerDrawing) {
+        throw "Forbidden System.Drawing.Common binary detected in installer publish output for $rid."
     }
 
     # Stage and pack Sparse MSIX Identity Package (strict validation; no /nv)
@@ -344,7 +398,7 @@ foreach ($rid in $Runtimes) {
         }
         New-Item -ItemType Directory -Force -Path $sparseValidateDir | Out-Null
         Copy-Item -Path (Join-Path $sparseStageDir '*') -Destination $sparseValidateDir -Recurse -Force
-        Copy-Item -Path (Join-Path $publishDir 'Shima.App.exe') -Destination $sparseValidateDir -Force
+        Copy-Item -Path (Join-Path $installerPublishDir 'Shima.App.exe') -Destination $sparseValidateDir -Force
 
         Write-Host "Validating Sparse MSIX manifest & assets (strict MakeAppx, without /nv) for $rid..."
         & $makeAppx pack /o /d $sparseValidateDir /p $tempValidateMsix
@@ -403,25 +457,27 @@ foreach ($rid in $Runtimes) {
         $msixZip.Dispose()
     }
 
-    $publishSparseDir = Join-Path $publishDir 'sparse-identity'
+    $publishSparseDir = Join-Path $installerPublishDir 'sparse-identity'
     New-Item -ItemType Directory -Force -Path $publishSparseDir | Out-Null
     Copy-Item -Path $msixPath -Destination $publishSparseDir -Force
     Copy-Item -Path $registerScriptPath -Destination $publishSparseDir -Force
     $bundledMsixPath = Join-Path $publishSparseDir (Split-Path -Leaf $msixPath)
 
-    $publishAssetsDir = Join-Path $publishDir 'Assets'
+    $publishAssetsDir = Join-Path $installerPublishDir 'Assets'
     New-Item -ItemType Directory -Force -Path $publishAssetsDir | Out-Null
     Copy-Item -Path (Join-Path $sparseStageDir 'Assets\*.png') -Destination $publishAssetsDir -Force
 
     $stagedPriPath = Join-Path $sparseStageDir 'resources.pri'
     if (Test-Path $stagedPriPath) {
-        Copy-Item -Path $stagedPriPath -Destination (Join-Path $publishDir 'resources.pri') -Force
+        Copy-Item -Path $stagedPriPath -Destination (Join-Path $installerPublishDir 'resources.pri') -Force
     }
 
     if ($Sign) {
         $signTargets = @(
             (Join-Path $publishDir 'Shima.App.exe'),
             (Join-Path $publishDir 'Shima.AgentBridge.exe'),
+            (Join-Path $installerPublishDir 'Shima.App.exe'),
+            (Join-Path $installerPublishDir 'Shima.AgentBridge.exe'),
             $msixPath,
             $bundledMsixPath
         )
@@ -461,7 +517,7 @@ foreach ($rid in $Runtimes) {
             "/DAppVersion=$Version" `
             "/DAppFileVersion=$fourPartVersion" `
             "/DRid=$rid" `
-            "/DSourceDir=$publishDir" `
+            "/DSourceDir=$installerPublishDir" `
             "/DOutputDir=$releaseDir" `
             $innoScriptPath
         if ($LASTEXITCODE -ne 0) {

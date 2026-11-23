@@ -95,6 +95,8 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
     private readonly Action<string> _openUriAction;
     private readonly Func<DateTimeOffset> _utcNowProvider;
     private readonly SemaphoreSlim _workGate = new(1, 1);
+    private readonly CancellationTokenSource _disposeCts = new();
+    private readonly CancellationToken _disposeToken;
     private readonly Dictionary<string, bool> _groupExpandState = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _sync = new();
 
@@ -102,6 +104,7 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
     private Action<Action>? _uiDispatcher;
     private InboxSettings _settings = new();
     private Task _pendingWorkTask = Task.CompletedTask;
+    private long _refreshVersion;
 
     private NotificationAccessState _accessState = NotificationAccessState.IdentityUnavailable;
     private bool _hasNotifications;
@@ -121,6 +124,7 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
         _preferencesService = preferencesService;
         _openUriAction = openUriAction ?? DefaultOpenUri;
         _utcNowProvider = utcNowProvider ?? (() => DateTimeOffset.UtcNow);
+        _disposeToken = _disposeCts.Token;
     }
 
     public ObservableCollection<InboxAppGroupViewModel> AppGroups { get; } = [];
@@ -291,18 +295,19 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
             _preferencesService.PreferencesChanged += OnPreferencesChanged;
         }
 
-        await _repository.PruneExpiredAsync(RetentionDays, InboxNotificationItem.MaxStoredItems, _utcNowProvider(), ct)
-            .ConfigureAwait(false);
+        await RunUnderWorkGateAsync(
+            token => _repository.PruneExpiredAsync(RetentionDays, InboxNotificationItem.MaxStoredItems, _utcNowProvider(), token),
+            ct).ConfigureAwait(false);
 
         await RefreshListenerAndSnapshotAsync(ct).ConfigureAwait(false);
-        await RefreshGroupsCoreAsync(ct).ConfigureAwait(false);
+        await RunUnderWorkGateAsync(RefreshGroupsCoreAsync, ct).ConfigureAwait(false);
         RaiseSettingsProperties();
     }
 
     public async Task RefreshAccessStateAsync(CancellationToken ct = default)
     {
         await RefreshListenerAndSnapshotAsync(ct).ConfigureAwait(false);
-        await RefreshGroupsCoreAsync(ct).ConfigureAwait(false);
+        await RunUnderWorkGateAsync(RefreshGroupsCoreAsync, ct).ConfigureAwait(false);
     }
 
     public async Task RequestNotificationAccessAsync(CancellationToken ct = default)
@@ -316,7 +321,7 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
             await ImportCurrentSnapshotSilentlyAsync(ct).ConfigureAwait(false);
         }
 
-        await RefreshGroupsCoreAsync(ct).ConfigureAwait(false);
+        await RunUnderWorkGateAsync(RefreshGroupsCoreAsync, ct).ConfigureAwait(false);
     }
 
     public void OpenWindowsNotificationSettings()
@@ -591,7 +596,16 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
             _preferencesService.PreferencesChanged -= OnPreferencesChanged;
         }
 
+        try
+        {
+            _disposeCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
         _workGate.Dispose();
+        _disposeCts.Dispose();
     }
 
     private async Task RefreshListenerAndSnapshotAsync(CancellationToken ct)
@@ -622,6 +636,7 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task RefreshGroupsCoreAsync(CancellationToken ct)
     {
+        var refreshVersion = Interlocked.Increment(ref _refreshVersion);
         var groups = await _repository.GetGroupedByAppAsync(includeDismissed: false, ct).ConfigureAwait(false);
         var vms = new List<InboxAppGroupViewModel>(groups.Count);
         var total = 0;
@@ -661,6 +676,11 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
 
         DispatchToUi(() =>
         {
+            if (_disposed || Volatile.Read(ref _refreshVersion) != refreshVersion)
+            {
+                return;
+            }
+
             AppGroups.Clear();
             foreach (var vm in vms)
             {
@@ -672,6 +692,67 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
         });
     }
 
+    private async Task RunUnderWorkGateAsync(Func<CancellationToken, Task> work, CancellationToken ct)
+    {
+        await _workGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            await work(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            ReleaseWorkGateSafely();
+        }
+    }
+
+    private async Task RunUnderWorkGateSafeAsync(Func<CancellationToken, Task> work, CancellationToken ct)
+    {
+        try
+        {
+            await _workGate.WaitAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when ((ex is OperationCanceledException or ObjectDisposedException)
+            && (_disposed || ct.IsCancellationRequested))
+        {
+            return;
+        }
+
+        try
+        {
+            if (_disposed || ct.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await work(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when ((ex is OperationCanceledException or ObjectDisposedException)
+            && (_disposed || ct.IsCancellationRequested))
+        {
+            // Ignore shutdown cancellations cleanly during teardown.
+        }
+        finally
+        {
+            ReleaseWorkGateSafely();
+        }
+    }
+
+    private void ReleaseWorkGateSafely()
+    {
+        try
+        {
+            _workGate.Release();
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+        }
+    }
+
     private void OnAdapterNotificationArrived(object? sender, OsNotificationEventArgs e)
     {
         if (_disposed)
@@ -679,7 +760,18 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        EnqueueWork(() => HandleNotificationArrivedAsync(e.Notification, allowPeek: true, CancellationToken.None));
+        EnqueueWork(async () =>
+        {
+            try
+            {
+                await HandleNotificationArrivedAsync(e.Notification, allowPeek: true, _disposeToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when ((ex is OperationCanceledException or ObjectDisposedException)
+                && (_disposed || _disposeToken.IsCancellationRequested))
+            {
+            }
+        });
     }
 
     private void OnAdapterNotificationRemovedExternally(object? sender, uint osToastId)
@@ -689,7 +781,18 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        EnqueueWork(() => HandleNotificationRemovedExternallyAsync(osToastId, CancellationToken.None));
+        EnqueueWork(async () =>
+        {
+            try
+            {
+                await HandleNotificationRemovedExternallyAsync(osToastId, _disposeToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when ((ex is OperationCanceledException or ObjectDisposedException)
+                && (_disposed || _disposeToken.IsCancellationRequested))
+            {
+            }
+        });
     }
 
     private void OnPreferencesChanged(object? sender, AppPreferencesSnapshot e)
@@ -699,13 +802,15 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        EnqueueWork(async () =>
-        {
-            await _repository
-                .PruneExpiredAsync(RetentionDays, InboxNotificationItem.MaxStoredItems, _utcNowProvider(), CancellationToken.None)
-                .ConfigureAwait(false);
-            await RefreshGroupsCoreAsync(CancellationToken.None).ConfigureAwait(false);
-        });
+        EnqueueWork(() => RunUnderWorkGateSafeAsync(
+            async ct =>
+            {
+                await _repository
+                    .PruneExpiredAsync(RetentionDays, InboxNotificationItem.MaxStoredItems, _utcNowProvider(), ct)
+                    .ConfigureAwait(false);
+                await RefreshGroupsCoreAsync(ct).ConfigureAwait(false);
+            },
+            _disposeToken));
     }
 
     private void EnqueueWork(Func<Task> work)

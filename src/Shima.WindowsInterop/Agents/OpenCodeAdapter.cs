@@ -66,6 +66,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
     private AdapterHealthResult _lastHealthResult = new(AdapterHealthStatus.Disconnected, "Not started.");
     private PermissionReplyRoute _replyRoute = PermissionReplyRoute.None;
     private bool? _pluginSupportsInteractiveHook;
+    private bool _pluginBridgeActive;
     private bool _authBlocked;
     private long _duplicateEventsIgnored;
     private long _ambiguousEventsIgnored;
@@ -147,6 +148,17 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
     internal int ReconnectAttemptCount => Volatile.Read(ref _reconnectAttempts);
 
     internal bool IsExpiryTimerPending => _expiryTimer.IsPending;
+
+    internal bool IsPluginBridgeActive
+    {
+        get
+        {
+            lock (_stateSync)
+            {
+                return _pluginBridgeActive;
+            }
+        }
+    }
 
     public AgentConnectionState ConnectionState
     {
@@ -308,12 +320,19 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
             if (healthResp.StatusCode == HttpStatusCode.Unauthorized)
             {
-                MarkAuthenticationRequired();
-                return _lastHealthResult;
+                MarkAuthenticationRequired(baseUri);
+                return GetLastHealthResult();
             }
 
             if (!healthResp.IsSuccessStatusCode)
             {
+                if (IsPluginBridgeActive)
+                {
+                    return new AdapterHealthResult(
+                        AdapterHealthStatus.Healthy,
+                        $"Plugin bridge active (\\\\.\\pipe\\{_pluginPipeName}); HTTP server returned HTTP {(int)healthResp.StatusCode}.");
+                }
+
                 return new AdapterHealthResult(
                     AdapterHealthStatus.Disconnected,
                     $"OpenCode server health check returned HTTP {(int)healthResp.StatusCode}.");
@@ -322,7 +341,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
             await RefreshDocCapabilitiesAsync(baseUri, ct).ConfigureAwait(false);
             if (_authBlocked)
             {
-                return _lastHealthResult;
+                return GetLastHealthResult();
             }
 
             var message = _replyRoute.Kind != PermissionReplyKind.None
@@ -343,7 +362,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         }
         catch (Exception ex)
         {
-            var isPluginActive = IsPluginInstalled() && ConnectionState == AgentConnectionState.Connected;
+            var isPluginActive = IsPluginBridgeActive || (IsPluginInstalled() && ConnectionState == AgentConnectionState.Connected);
             if (isPluginActive)
             {
                 return new AdapterHealthResult(
@@ -457,7 +476,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                MarkAuthenticationRequired();
+                MarkAuthenticationRequired(baseUri);
                 return new PermissionActionResult(
                     false,
                     null,
@@ -543,6 +562,8 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         var tempPath = $"{_pluginFilePath}.tmp.{Guid.NewGuid():N}";
         await File.WriteAllTextAsync(tempPath, script, Utf8NoBom, ct).ConfigureAwait(false);
         File.Move(tempPath, _pluginFilePath, overwrite: true);
+
+        await EnsurePluginLoopRunningAsync(ct).ConfigureAwait(false);
 
         return new HookInstallResult(
             true,
@@ -716,6 +737,38 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
+    private async Task EnsurePluginLoopRunningAsync(CancellationToken ct)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        await _lifecycleGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_disposed
+                || !_shouldRunOnOptIn
+                || !_preferences.Current.OpenCodeOptInEnabled
+                || _pluginLoopTask is not null
+                || !IsPluginInstalled())
+            {
+                return;
+            }
+
+            _runCts ??= new CancellationTokenSource();
+            var token = _runCts.Token;
+            if (!token.IsCancellationRequested)
+            {
+                _pluginLoopTask = Task.Run(() => RunPluginPipeAcceptLoopAsync(token), CancellationToken.None);
+            }
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
     private async Task StopLoopsLockedAsync()
     {
         var cts = _runCts;
@@ -724,6 +777,10 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         _runCts = null;
         _sseLoopTask = null;
         _pluginLoopTask = null;
+        lock (_stateSync)
+        {
+            _pluginBridgeActive = false;
+        }
 
         if (cts is not null)
         {
@@ -778,7 +835,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
                 if (healthResp.StatusCode == HttpStatusCode.Unauthorized)
                 {
-                    MarkAuthenticationRequired();
+                    MarkAuthenticationRequired(baseUri);
                     return;
                 }
 
@@ -814,7 +871,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                 {
                     if (sseResponse.StatusCode == HttpStatusCode.Unauthorized)
                     {
-                        MarkAuthenticationRequired();
+                        MarkAuthenticationRequired(baseUri);
                         return;
                     }
 
@@ -867,14 +924,17 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                     ? AgentConnectionState.Disconnected
                     : AgentConnectionState.Reconnecting;
 
-                SetConnectionState(nextState);
-                lock (_stateSync)
+                if (!IsPluginBridgeActive)
                 {
-                    _lastHealthResult = new AdapterHealthResult(
-                        nextState == AgentConnectionState.Reconnecting
-                            ? AdapterHealthStatus.Reconnecting
-                            : AdapterHealthStatus.Disconnected,
-                        $"OpenCode stream interrupted ({ex.Message}); retrying ({attempt}).");
+                    SetConnectionState(nextState);
+                    lock (_stateSync)
+                    {
+                        _lastHealthResult = new AdapterHealthResult(
+                            nextState == AgentConnectionState.Reconnecting
+                                ? AdapterHealthStatus.Reconnecting
+                                : AdapterHealthStatus.Disconnected,
+                            $"OpenCode stream interrupted ({ex.Message}); retrying ({attempt}).");
+                    }
                 }
 
                 try
@@ -955,7 +1015,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
             if (docResp.StatusCode == HttpStatusCode.Unauthorized)
             {
-                MarkAuthenticationRequired();
+                MarkAuthenticationRequired(baseUri);
                 return;
             }
 
@@ -1065,7 +1125,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                 .ConfigureAwait(false);
             if (sessionsResp.StatusCode == HttpStatusCode.Unauthorized)
             {
-                MarkAuthenticationRequired();
+                MarkAuthenticationRequired(baseUri);
                 return;
             }
 
@@ -1090,7 +1150,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                 .ConfigureAwait(false);
             if (statusResp.StatusCode == HttpStatusCode.Unauthorized)
             {
-                MarkAuthenticationRequired();
+                MarkAuthenticationRequired(baseUri);
                 return;
             }
 
@@ -1115,7 +1175,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                 .ConfigureAwait(false);
             if (permResp.StatusCode == HttpStatusCode.Unauthorized)
             {
-                MarkAuthenticationRequired();
+                MarkAuthenticationRequired(baseUri);
                 return;
             }
 
@@ -1308,28 +1368,45 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                 return false;
             }
 
-            var properties = eventObj.TryGetProperty("properties", out var propsEl) && propsEl.ValueKind == JsonValueKind.Object
-                ? propsEl
-                : eventObj;
+            var normalizedEventType = eventType.Trim();
+            if (IsQuietlyIgnoredEventType(normalizedEventType))
+            {
+                return false;
+            }
+
+            JsonElement properties;
+            if (eventObj.TryGetProperty("properties", out var propsEl) && propsEl.ValueKind == JsonValueKind.Object)
+            {
+                properties = propsEl;
+            }
+            else if (eventObj.TryGetProperty("data", out var dataEl) && dataEl.ValueKind == JsonValueKind.Object)
+            {
+                properties = dataEl;
+            }
+            else
+            {
+                properties = eventObj;
+            }
 
             var permissionId = GetString(properties, "id")
                 ?? GetString(properties, "permissionID")
                 ?? GetString(properties, "permissionId")
                 ?? GetString(properties, "requestID")
-                ?? GetString(properties, "requestId");
+                ?? GetString(properties, "requestId")
+                ?? GetNestedString(properties, "form", "id");
 
             var nativeSessionId = ResolveNativeSessionId(properties, eventObj, permissionId);
             if (string.IsNullOrWhiteSpace(nativeSessionId))
             {
                 // Strict multi-session isolation: ignore ambiguous payloads lacking session/permission ownership.
                 Interlocked.Increment(ref _ambiguousEventsIgnored);
-                _logger?.Warn($"Ignored ambiguous OpenCode event '{eventType}' with no resolvable sessionID.");
+                _logger?.Warn($"Ignored ambiguous OpenCode event '{normalizedEventType}' with no resolvable sessionID.");
                 return false;
             }
 
             var namespacedId = $"{Id}:{nativeSessionId}";
             var now = _utcNowProvider().ToUniversalTime();
-            var dedupKey = BuildDedupKey(nativeSessionId, eventType, permissionId, properties, rawJson);
+            var dedupKey = BuildDedupKey(nativeSessionId, normalizedEventType, permissionId, properties, eventObj, rawJson);
             var tracked = _sessions.GetOrAdd(
                 namespacedId,
                 _ => new TrackedSession(CreateDefaultSnapshot(namespacedId, topDirectory, now)));
@@ -1343,14 +1420,18 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
             var previous = tracked.Snapshot;
             var eventDirectory = GetString(properties, "directory")
                 ?? GetString(properties, "cwd")
+                ?? GetNestedString(properties, "location", "directory")
+                ?? GetNestedString(properties, "shell", "cwd")
                 ?? GetNestedString(properties, "info", "directory")
                 ?? topDirectory
                 ?? previous.WorkspacePath;
             var eventTitle = GetNestedString(properties, "info", "title")
                 ?? GetString(properties, "title")
                 ?? GetString(properties, "summary");
+            var enrichedSessionTitle = GetString(root, "sessionTitle");
             var eventPid = GetInt(properties, "pid")
                 ?? GetInt(properties, "processId")
+                ?? GetNestedInt(properties, "shell", "pid")
                 ?? GetNestedInt(properties, "info", "pid");
 
             var next = previous with
@@ -1366,8 +1447,14 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
             {
                 next = next with { TaskSummary = eventTitle };
             }
+            else if (!string.IsNullOrWhiteSpace(enrichedSessionTitle)
+                     && (string.IsNullOrWhiteSpace(next.TaskSummary)
+                         || string.Equals(next.TaskSummary, "OpenCode session", StringComparison.Ordinal)))
+            {
+                next = next with { TaskSummary = enrichedSessionTitle };
+            }
 
-            switch (eventType.Trim())
+            switch (normalizedEventType)
             {
                 case "session.created":
                 case "session.updated":
@@ -1386,6 +1473,54 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                     else if (next.Status != AgentStatus.AwaitingApproval)
                     {
                         next = next with { Status = AgentStatus.Working, IsFatalError = false };
+                    }
+
+                    break;
+
+                case "session.renamed":
+                case "session.moved":
+                    if (!string.IsNullOrWhiteSpace(enrichedSessionTitle) && string.IsNullOrWhiteSpace(eventTitle))
+                    {
+                        next = next with { TaskSummary = enrichedSessionTitle };
+                    }
+
+                    break;
+
+                case "session.execution.started":
+                    next = next with
+                    {
+                        Status = AgentStatus.Working,
+                        IsFatalError = false,
+                        PendingRequestId = null,
+                        PendingToolName = null,
+                        PendingActionSummary = null,
+                        HasActionablePermissionRequest = false,
+                        TaskSummary = !string.IsNullOrWhiteSpace(enrichedSessionTitle)
+                            ? enrichedSessionTitle
+                            : next.TaskSummary
+                    };
+                    break;
+
+                case "session.step.started":
+                case "session.step.streamed":
+                case "session.step.ended":
+                case "session.text.started":
+                case "session.text.ended":
+                case "session.reasoning.started":
+                case "session.reasoning.ended":
+                case "session.compaction.started":
+                case "session.compaction.ended":
+                    if (next.Status != AgentStatus.AwaitingApproval)
+                    {
+                        var phaseSummary = normalizedEventType == "session.compaction.started"
+                            ? "Compacting session"
+                            : next.TaskSummary;
+                        next = next with
+                        {
+                            Status = AgentStatus.Working,
+                            IsFatalError = false,
+                            TaskSummary = phaseSummary
+                        };
                     }
 
                     break;
@@ -1416,28 +1551,60 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                 case "tool.execute.after":
                 case "message.updated":
                 case "message.part.updated":
-                    var toolName = GetString(properties, "tool")
+                case "session.tool.input.started":
+                case "session.tool.called":
+                case "session.tool.progress":
+                case "session.tool.success":
+                case "session.shell.started":
+                case "session.shell.ended":
+                    var toolName = GetString(properties, "name")
+                        ?? GetString(properties, "tool")
                         ?? GetNestedString(properties, "part", "tool")
                         ?? GetString(properties, "toolName");
+                    var shellCommand = normalizedEventType == "session.shell.started"
+                        ? GetNestedString(properties, "shell", "command")
+                        : null;
                     if (next.Status != AgentStatus.AwaitingApproval)
                     {
+                        var toolSummary = !string.IsNullOrWhiteSpace(toolName)
+                            ? $"Running {toolName}"
+                            : !string.IsNullOrWhiteSpace(shellCommand)
+                                ? $"Running {TruncateSummary(shellCommand, 72)}"
+                                : next.TaskSummary;
                         next = next with
                         {
                             Status = AgentStatus.Working,
                             IsFatalError = false,
-                            TaskSummary = !string.IsNullOrWhiteSpace(toolName)
-                                ? $"Running {toolName}"
-                                : next.TaskSummary
+                            TaskSummary = toolSummary
                         };
                     }
 
                     break;
 
+                case "session.retry.scheduled":
+                    var retryMessage = GetNestedString(properties, "error", "message")
+                        ?? GetString(properties, "message")
+                        ?? "Retrying session";
+                    next = next with
+                    {
+                        Status = AgentStatus.NeedsAttention,
+                        IsFatalError = false,
+                        TaskSummary = retryMessage
+                    };
+                    break;
+
                 case "session.error":
                 case "tool.execute.error":
+                case "session.execution.failed":
+                case "session.step.failed":
+                case "session.compaction.failed":
+                case "session.tool.failed":
+                    var isNonFatalByType = normalizedEventType is "session.tool.failed" or "session.compaction.failed";
                     var isFatalError = GetBool(properties, "fatal")
                         ?? GetBool(properties, "isFatal")
-                        ?? (GetNestedBool(properties, "error", "isRetryable") is true ? false : true);
+                        ?? (isNonFatalByType
+                            ? false
+                            : (GetNestedBool(properties, "error", "isRetryable") is true ? false : true));
                     var errMessage = GetNestedString(properties, "error", "data", "message")
                         ?? GetNestedString(properties, "error", "message")
                         ?? GetString(properties, "message")
@@ -1456,6 +1623,8 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
                 case "session.idle":
                 case "session.deleted":
+                case "session.execution.succeeded":
+                case "session.execution.interrupted":
                     next = next with
                     {
                         Status = AgentStatus.Finished,
@@ -1493,10 +1662,13 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                     _permissionToSession[resolvedPermId] = nativeSessionId;
 
                     var permTool = GetString(properties, "permission")
+                        ?? GetString(properties, "action")
                         ?? GetString(properties, "tool")
                         ?? GetString(properties, "type")
                         ?? "Permission";
                     var permSummary = GetString(properties, "title")
+                        ?? GetString(properties, "message")
+                        ?? GetFirstStringInArray(properties, "resources")
                         ?? GetString(properties, "pattern")
                         ?? GetNestedString(properties, "metadata", "command")
                         ?? permTool;
@@ -1514,6 +1686,34 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                     break;
 
                 case "permission.replied":
+                    next = next with
+                    {
+                        Status = AgentStatus.Working,
+                        IsFatalError = false,
+                        PendingRequestId = null,
+                        PendingToolName = null,
+                        PendingActionSummary = null,
+                        HasActionablePermissionRequest = false
+                    };
+                    break;
+
+                case "form.created":
+                    var formId = GetNestedString(properties, "form", "id") ?? permissionId ?? $"form_{Guid.NewGuid():N}";
+                    _permissionToSession[formId] = nativeSessionId;
+                    var formSummary = GetNestedString(properties, "form", "title") ?? "Input requested";
+                    next = next with
+                    {
+                        Status = AgentStatus.AwaitingApproval,
+                        IsFatalError = false,
+                        PendingRequestId = formId,
+                        PendingToolName = "Form",
+                        PendingActionSummary = formSummary,
+                        HasActionablePermissionRequest = false
+                    };
+                    break;
+
+                case "form.replied":
+                case "form.cancelled":
                     next = next with
                     {
                         Status = AgentStatus.Working,
@@ -1677,7 +1877,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                     if (string.Equals(kind, "handshake", StringComparison.OrdinalIgnoreCase))
                     {
                         _pluginSupportsInteractiveHook = GetBool(root, "supportsInteractivePermissionHook") ?? false;
-                        SetConnectionState(AgentConnectionState.Connected);
+                        MarkPluginBridgeActive();
                         continue;
                     }
 
@@ -1701,7 +1901,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                             _pluginSupportsInteractiveHook = GetBool(root, "supportsInteractivePermissionHook") ?? true;
                         }
 
-                        SetConnectionState(AgentConnectionState.Connected);
+                        MarkPluginBridgeActive();
                         var rawSessionId = GetString(root, "sessionID") ?? GetString(root, "sessionId");
                         var reqId = GetString(root, "requestId") ?? Guid.NewGuid().ToString("N");
                         if (!string.IsNullOrWhiteSpace(rawSessionId))
@@ -1727,11 +1927,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
                         continue;
                     }
 
-                    if (ConnectionState != AgentConnectionState.Connected)
-                    {
-                        SetConnectionState(AgentConnectionState.Connected);
-                    }
-
+                    MarkPluginBridgeActive();
                     ProcessSerializedEventPayload(line);
                 }
                 catch
@@ -1807,17 +2003,53 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         SessionUpdated?.Invoke(this, next);
     }
 
-    private void MarkAuthenticationRequired()
+    private AdapterHealthResult GetLastHealthResult()
     {
-        _authBlocked = true;
         lock (_stateSync)
         {
-            _lastHealthResult = new AdapterHealthResult(
-                AdapterHealthStatus.AuthenticationRequired,
-                "Authentication required (HTTP 401): configure or update OpenCode server password in Developer Integrations Settings.");
+            return _lastHealthResult;
+        }
+    }
+
+    private void MarkPluginBridgeActive()
+    {
+        lock (_stateSync)
+        {
+            _pluginBridgeActive = true;
+            if (_authBlocked || _lastHealthResult.Status != AdapterHealthStatus.Healthy)
+            {
+                _lastHealthResult = new AdapterHealthResult(
+                    AdapterHealthStatus.Healthy,
+                    _authBlocked
+                        ? $"Plugin bridge active (\\\\.\\pipe\\{_pluginPipeName}); HTTP server requires password for snapshots/approvals."
+                        : $"Plugin bridge active (\\\\.\\pipe\\{_pluginPipeName}).");
+            }
         }
 
-        SetConnectionState(AgentConnectionState.Disconnected);
+        SetConnectionState(AgentConnectionState.Connected);
+    }
+
+    private void MarkAuthenticationRequired(Uri? baseUri = null)
+    {
+        _authBlocked = true;
+        bool pluginActive;
+        lock (_stateSync)
+        {
+            pluginActive = _pluginBridgeActive;
+            var authoritySuffix = baseUri is not null ? $" at {baseUri.Authority}" : string.Empty;
+            _lastHealthResult = pluginActive
+                ? new AdapterHealthResult(
+                    AdapterHealthStatus.Healthy,
+                    $"Plugin bridge active (\\\\.\\pipe\\{_pluginPipeName}); HTTP server{authoritySuffix} returned 401 Unauthorized (configure password for HTTP snapshots/approvals).")
+                : new AdapterHealthResult(
+                    AdapterHealthStatus.AuthenticationRequired,
+                    "Authentication required (HTTP 401): configure or update OpenCode server password in Developer Integrations Settings.");
+        }
+
+        if (!pluginActive)
+        {
+            SetConnectionState(AgentConnectionState.Disconnected);
+        }
     }
 
     private void SetConnectionState(AgentConnectionState nextState)
@@ -1922,6 +2154,7 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
             ?? GetNestedString(properties, "info", "sessionID")
             ?? GetNestedString(properties, "info", "id")
             ?? GetNestedString(properties, "part", "sessionID")
+            ?? GetNestedString(properties, "form", "sessionID")
             ?? GetString(eventObj, "sessionID")
             ?? GetString(eventObj, "sessionId");
 
@@ -1939,14 +2172,40 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         return null;
     }
 
+    private static bool IsQuietlyIgnoredEventType(string eventType) =>
+        eventType is "session.text.delta"
+            or "session.reasoning.delta"
+            or "session.tool.input.delta"
+            or "session.compaction.delta"
+            or "message.part.delta"
+            or "session.viewed"
+            or "session.usage.updated"
+            or "session.usage.recorded"
+            or "session.message.content.updated"
+            or "model.updated"
+            or "provider.updated"
+            or "agent.updated"
+            or "server.connected"
+            or "project.updated"
+            or "worktree.resolved"
+            or "global.disposed"
+        || eventType.StartsWith("session.inbox.", StringComparison.Ordinal)
+        || eventType.StartsWith("mcp.", StringComparison.Ordinal)
+        || eventType.StartsWith("lsp.", StringComparison.Ordinal)
+        || eventType.StartsWith("tui.", StringComparison.Ordinal)
+        || eventType.StartsWith("pty.", StringComparison.Ordinal);
+
     private static string BuildDedupKey(
         string nativeSessionId,
         string eventType,
         string? permissionId,
         JsonElement properties,
+        JsonElement eventObj,
         string rawJson)
     {
+        var rootEventId = GetString(eventObj, "id");
         var eventOrPermId = permissionId
+            ?? rootEventId
             ?? GetString(properties, "eventId")
             ?? GetNestedString(properties, "part", "id")
             ?? GetNestedString(properties, "info", "id")
@@ -1954,7 +2213,13 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
         var timestamp = GetString(properties, "timestamp")
             ?? GetNestedString(properties, "time", "updated")
+            ?? GetScalarString(eventObj, "created")
             ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(rootEventId))
+        {
+            return $"{nativeSessionId}|{eventType}|{rootEventId}|{eventOrPermId}|{timestamp}";
+        }
 
         if (!string.IsNullOrEmpty(timestamp))
         {
@@ -1964,6 +2229,12 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawJson));
         var shortHash = Convert.ToHexString(hashBytes.AsSpan(0, 8));
         return $"{nativeSessionId}|{eventType}|{eventOrPermId}|{shortHash}";
+    }
+
+    private static string TruncateSummary(string text, int maxLength)
+    {
+        var singleLine = text.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return singleLine.Length <= maxLength ? singleLine : singleLine[..(maxLength - 1)] + "…";
     }
 
     private static AgentSessionSnapshot CreateDefaultSnapshot(string sessionId, string? directory, DateTimeOffset now) =>
@@ -2235,12 +2506,52 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
             ? GetBool(mid, k2)
             : null;
 
+    private static string? GetScalarString(JsonElement obj, string key)
+    {
+        if (obj.ValueKind != JsonValueKind.Object || !obj.TryGetProperty(key, out var prop))
+        {
+            return null;
+        }
+
+        return prop.ValueKind switch
+        {
+            JsonValueKind.String => prop.GetString(),
+            JsonValueKind.Number => prop.GetRawText(),
+            _ => null
+        };
+    }
+
+    private static string? GetFirstStringInArray(JsonElement obj, string key)
+    {
+        if (obj.ValueKind != JsonValueKind.Object
+            || !obj.TryGetProperty(key, out var arr)
+            || arr.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+            {
+                var value = item.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private static string CreateTimestampedBackup(string filePath)
     {
         var dir = Path.GetDirectoryName(filePath) ?? string.Empty;
         var name = Path.GetFileNameWithoutExtension(filePath);
         var ext = Path.GetExtension(filePath);
-        var backupPath = Path.Combine(dir, $"{name}.backup.{DateTimeOffset.UtcNow:yyyyMMdd-HHmmssfff}{ext}");
+        // Append .bak so OpenCode v2 plugin auto-discovery never tries to load backup files as plugins.
+        var backupPath = Path.Combine(dir, $"{name}.backup.{DateTimeOffset.UtcNow:yyyyMMdd-HHmmssfff}{ext}.bak");
         File.Copy(filePath, backupPath, overwrite: true);
         return backupPath;
     }
@@ -2253,31 +2564,182 @@ public sealed class OpenCodeAdapter : ICodingAgentAdapter, IOpenCodePluginManage
 
         const PIPE_PATH = "\\\\.\\pipe\\{{pipeName}}";
 
+        const IGNORED_EVENTS = new Set([
+          "session.text.delta",
+          "session.reasoning.delta",
+          "session.tool.input.delta",
+          "session.compaction.delta",
+          "message.part.delta",
+          "session.viewed",
+          "session.usage.updated",
+          "session.usage.recorded",
+          "session.message.content.updated",
+          "model.updated",
+          "provider.updated",
+          "agent.updated",
+          "server.connected",
+          "project.updated",
+          "worktree.resolved",
+        ]);
+
+        const FORWARDED_PREFIXES = [
+          "session.",
+          "permission.",
+          "tool.",
+          "message.",
+          "form.",
+        ];
+
+        function shouldForwardEvent(event) {
+          if (!event || typeof event.type !== "string" || !event.type) return false;
+          if (IGNORED_EVENTS.has(event.type) || event.type.startsWith("session.inbox.")) {
+            return false;
+          }
+          return FORWARDED_PREFIXES.some((prefix) => event.type.startsWith(prefix));
+        }
+
         function sendEvent(payload) {
           return new Promise((resolve) => {
-            const client = net.createConnection(PIPE_PATH, () => {
-              client.write(JSON.stringify(payload) + "\n");
-              client.end();
-              resolve();
-            });
-            client.setTimeout(50, () => {
-              client.destroy();
-              resolve();
-            });
-            client.on("error", () => resolve());
+            let settled = false;
+            const finish = () => {
+              if (!settled) {
+                settled = true;
+                resolve();
+              }
+            };
+
+            try {
+              const line = JSON.stringify(payload) + "\n";
+              const client = net.createConnection(PIPE_PATH, () => {
+                client.write(line, () => {
+                  client.end();
+                  finish();
+                });
+              });
+              client.setTimeout(250, () => {
+                client.destroy();
+                finish();
+              });
+              client.on("error", () => {
+                client.destroy();
+                finish();
+              });
+              client.on("close", finish);
+            } catch {
+              finish();
+            }
           });
+        }
+
+        function extractSessionId(event) {
+          const body = event?.data ?? event?.properties ?? event;
+          return (
+            body?.sessionID ??
+            body?.sessionId ??
+            body?.info?.sessionID ??
+            body?.info?.id ??
+            body?.form?.sessionID ??
+            null
+          );
         }
 
         export const ShimaBridgePlugin = async () => {
           return {
             event: async ({ event }) => {
-              if (!event || !event.type) return;
+              if (!shouldForwardEvent(event)) return;
               await sendEvent(event);
-            }
+            },
           };
         };
 
-        export default ShimaBridgePlugin;
+        export default {
+          id: "shima-bridge",
+          server: ShimaBridgePlugin,
+          async setup(ctx) {
+            void sendEvent({ kind: "handshake", supportsInteractivePermissionHook: false });
+
+            if (!ctx || !ctx.event || typeof ctx.event.subscribe !== "function") {
+              return;
+            }
+
+            const sessionMeta = new Map();
+            const defaultDirectory = ctx?.location?.directory ?? "";
+
+            const rememberMeta = (sessionID, title, directory) => {
+              if (!sessionID) return;
+              const existing = sessionMeta.get(sessionID) ?? {};
+              const next = {
+                title: title || existing.title || "",
+                directory: directory || existing.directory || defaultDirectory,
+              };
+              if (sessionMeta.size >= 64 && !sessionMeta.has(sessionID)) {
+                const oldest = sessionMeta.keys().next().value;
+                if (oldest) sessionMeta.delete(oldest);
+              }
+              sessionMeta.set(sessionID, next);
+            };
+
+            const resolveMeta = async (sessionID, event) => {
+              if (!sessionID) return { title: "", directory: defaultDirectory };
+              const data = event?.data ?? event?.properties ?? {};
+              const isSessionTitleEvent =
+                event.type === "session.created" ||
+                event.type === "session.updated" ||
+                event.type === "session.renamed";
+              const eventTitle = isSessionTitleEvent ? (data?.title ?? data?.info?.title ?? "") : "";
+              const eventDir = data?.location?.directory ?? data?.directory ?? data?.shell?.cwd ?? "";
+
+              if (eventTitle || eventDir) {
+                rememberMeta(sessionID, eventTitle, eventDir);
+              }
+
+              if (!sessionMeta.has(sessionID) && ctx?.session && typeof ctx.session.get === "function") {
+                try {
+                  const info = await ctx.session.get({ sessionID });
+                  if (info && typeof info === "object") {
+                    rememberMeta(sessionID, info.title, info.location?.directory ?? info.directory);
+                  }
+                } catch {
+                  rememberMeta(sessionID, "", defaultDirectory);
+                }
+              }
+
+              const meta = sessionMeta.get(sessionID) ?? { title: "", directory: defaultDirectory };
+              if (event.type === "session.deleted") {
+                sessionMeta.delete(sessionID);
+              }
+              return meta;
+            };
+
+            const controller = new AbortController();
+            try {
+              const stream = ctx.event.subscribe({ signal: controller.signal });
+              if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+                (async () => {
+                  try {
+                    for await (const event of stream) {
+                      if (!shouldForwardEvent(event)) continue;
+                      const sessionID = extractSessionId(event);
+                      const meta = await resolveMeta(sessionID, event);
+                      const payload = {
+                        ...event,
+                        ...(meta.directory ? { directory: meta.directory } : {}),
+                        ...(meta.title ? { sessionTitle: meta.title } : {}),
+                      };
+                      await sendEvent(payload);
+                    }
+                  } catch {
+                    // Fail open on stream close or teardown.
+                  }
+                })();
+              }
+            } catch {
+              // Fail open if host event subscription signature differs.
+            }
+
+            return () => controller.abort();
+          },
+        };
         """;
 
     private static async Task DefaultDelayWithJitterAsync(TimeSpan baseDelay, CancellationToken ct)
