@@ -251,6 +251,9 @@ public sealed class ClipboardWidgetViewModel : INotifyPropertyChanged, IDisposab
     public void AttachUiDispatcher(Action<Action> dispatch) =>
         _uiDispatcher = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
 
+    public void OpenSettings() =>
+        _context?.Events.Publish(new OpenSettingsRequestedEvent("Clipboard"));
+
     public async Task InitializeAsync(IWidgetContext context, CancellationToken ct = default)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -505,7 +508,7 @@ public sealed class ClipboardWidgetViewModel : INotifyPropertyChanged, IDisposab
         }
 
         RaiseSettingsProperties();
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     internal async Task WaitForPendingWorkAsync()

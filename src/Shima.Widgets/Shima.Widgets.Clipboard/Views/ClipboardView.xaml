@@ -123,11 +123,13 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Search + Pause + Clear unpinned -->
+        <!-- Search + Pause + Clear unpinned + Settings -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="4" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="4" />
                 <ColumnDefinition Width="Auto" />
@@ -156,6 +158,15 @@
                     Click="OnClearUnpinnedClicked"
                     AutomationProperties.Name="Clear unpinned clipboard history"
                     AutomationProperties.AutomationId="ClipboardClearUnpinnedButton" />
+
+            <Button Grid.Column="6"
+                    Style="{StaticResource ClipboardHeaderButtonStyle}"
+                    Padding="6,4"
+                    Content="&#x2699;"
+                    ToolTip="Open Clipboard settings"
+                    Click="OnOpenSettingsClicked"
+                    AutomationProperties.Name="Open Clipboard settings"
+                    AutomationProperties.AutomationId="ClipboardOpenSettingsButton" />
         </Grid>
 
         <!-- Compact inline confirmation / status pill -->

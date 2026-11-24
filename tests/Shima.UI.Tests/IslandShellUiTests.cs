@@ -1,14 +1,26 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using FlaUI.UIA3;
 using FluentAssertions;
 using NSubstitute;
+using Shima.Core.Appearance;
+using Shima.Core.Color;
 using Shima.Core.Contracts;
 using Shima.Core.Shell;
+using Shima.Infrastructure.Appearance;
+using Shima.Infrastructure.Color;
+using Shima.Infrastructure.Configuration;
+using Shima.Infrastructure.Storage;
+using Shima.Presentation.Settings;
 using Shima.Presentation.Shell;
+using Shima.Presentation.Theming;
 using Shima.Widgets.Developer;
 using Shima.Widgets.Developer.Views;
 using Shima.Widgets.NowPlaying;
@@ -219,7 +231,7 @@ public sealed class IslandShellUiTests
     }
 
     [Fact]
-    public async Task IslandWindow_MediaWithActiveDeveloperAgent_RendersRightSideGreenCompanionAndRevertsSmoothly()
+    public async Task IslandWindow_MediaWithActiveDeveloperAgent_RendersBottomEdgeCompanionBarAcrossModesAndStates()
     {
         using var host = new StaWpfTestHost();
         await using var harness = await host.RunAsync(() => CreateHarness(host, reducedMotion: false));
@@ -228,7 +240,7 @@ public sealed class IslandShellUiTests
         await host.RunAsync(() => harness.IslandWindow.Show());
         await host.PumpAsync();
 
-        // 1. Media playing alone -> NowPlayingCompactView fills pill width with right accent dot visible
+        // 1. Media playing alone -> NowPlayingCompactView intact, bottom-edge bar collapsed
         compHarness.EmitMediaPlaying("Midnight City", "M83");
         await host.PumpAsync();
 
@@ -236,110 +248,170 @@ public sealed class IslandShellUiTests
         harness.StateManager.CompactActiveWidgetId.Should().Be(NowPlayingWidgetModule.Id);
         harness.StateManager.CompactCompanionWidgetId.Should().BeNull();
 
-        var (mediaOnlyWidth, initialDotVis, initialCompanionVis) = await host.RunAsync(() =>
+        var (mediaOnlyWidth, initialDotVis, initialCompVis) = await host.RunAsync(() =>
         {
             var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
             var nowPlayingView = (NowPlayingCompactView)activePresenter.Content;
             var dot = (FrameworkElement)nowPlayingView.FindName("PlayingAccentDot");
-            var companionHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
-            return (nowPlayingView.ActualWidth, dot.Visibility, companionHost.Visibility);
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            return (nowPlayingView.ActualWidth, dot.Visibility, compHost.Visibility);
         });
         initialDotVis.Should().Be(Visibility.Visible);
-        initialCompanionVis.Should().Be(Visibility.Collapsed);
+        initialCompVis.Should().Be(Visibility.Collapsed);
 
-        // 2. Developer activity starts Working -> green companion pill animates in on right, replaces dot, music shrinks cleanly on left
+        // 2. Working -> green slim bar tucked along bottom edge inside pill, Now Playing intact, zero extra text, sweep active
         compHarness.EmitDeveloperSession(AgentStatus.Working, isFatalError: false);
-        await Task.Delay(320);
+        await Task.Delay(260);
         await host.PumpAsync();
 
         harness.StateManager.CompactActiveWidgetId.Should().Be(NowPlayingWidgetModule.Id);
         harness.StateManager.CompactCompanionWidgetId.Should().Be(DeveloperWidgetModule.Id);
 
-        var (mediaWithCompanionWidth, activeDotVis, companionVis, companionWidth, companionOpacity, artworkRightX, companionLeftX) =
-            await host.RunAsync(() =>
-            {
-                var activeLayer = (FrameworkElement)harness.IslandWindow.FindName("ActiveLayer");
-                var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
-                var nowPlayingView = (NowPlayingCompactView)activePresenter.Content;
-                var artwork = (FrameworkElement)nowPlayingView.FindName("CompactArtworkBorder");
-                var dot = (FrameworkElement)nowPlayingView.FindName("PlayingAccentDot");
-                var companionHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
-                var companionPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
-                companionPresenter.Content.Should().BeOfType<DeveloperCompactCompanionView>();
-
-                var artRight = artwork.TranslatePoint(new Point(artwork.ActualWidth, 0), activeLayer).X;
-                var compLeft = companionHost.TranslatePoint(new Point(0, 0), activeLayer).X;
-                return (
-                    nowPlayingView.ActualWidth,
-                    dot.Visibility,
-                    companionHost.Visibility,
-                    companionHost.ActualWidth,
-                    companionHost.Opacity,
-                    artRight,
-                    compLeft);
-            });
-
-        activeDotVis.Should().Be(Visibility.Collapsed);
-        companionVis.Should().Be(Visibility.Visible);
-        companionWidth.Should().BeGreaterThan(25.0);
-        companionOpacity.Should().BeApproximately(1.0, 0.05);
-        artworkRightX.Should().BeLessThan(companionLeftX);
-        mediaWithCompanionWidth.Should().BeLessThan(mediaOnlyWidth);
-        compHarness.DeveloperModule.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Working);
-        compHarness.DeveloperModule.ViewModel.BarFillBrushKey.Should().Be("AgentStatusWorkingBrush");
-
-        // 3. Urgent attention (approval needed) still takes primary compact pill priority over Media
-        compHarness.EmitDeveloperSession(AgentStatus.AwaitingApproval, isFatalError: false);
-        await host.PumpAsync();
-
-        harness.StateManager.CompactActiveWidgetId.Should().Be(DeveloperWidgetModule.Id);
-        harness.StateManager.CompactCompanionWidgetId.Should().BeNull();
-        await host.RunAsync(() =>
-        {
-            var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
-            var companionHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
-            activePresenter.Content.Should().BeOfType<DeveloperCompactView>();
-            companionHost.Visibility.Should().Be(Visibility.Collapsed);
-            harness.StateManager.ClearNotificationPeek();
-        });
-        await host.PumpAsync();
-
-        // 4. Returning to Working restores Media on left + green Agent pill on right
-        compHarness.EmitDeveloperSession(AgentStatus.Working, isFatalError: false);
-        await Task.Delay(320);
-        await host.PumpAsync();
-
-        harness.StateManager.CurrentState.Should().Be(IslandShellState.Active);
-        harness.StateManager.CompactActiveWidgetId.Should().Be(NowPlayingWidgetModule.Id);
-        harness.StateManager.CompactCompanionWidgetId.Should().Be(DeveloperWidgetModule.Id);
-
-        // 5. Developer finishes -> hover acknowledges bar to Idle -> companion smoothly collapses and music expands back
-        compHarness.EmitDeveloperSession(AgentStatus.Finished, isFatalError: false);
-        await host.PumpAsync();
-        compHarness.DeveloperModule.OnCollapsedNotchHovered(); // Finished -> Idle immediately
-        await Task.Delay(320);
-        await host.PumpAsync();
-
-        harness.StateManager.CurrentState.Should().Be(IslandShellState.Active);
-        harness.StateManager.CompactActiveWidgetId.Should().Be(NowPlayingWidgetModule.Id);
-        harness.StateManager.CompactCompanionWidgetId.Should().BeNull();
-
-        var (revertedMediaWidth, revertedDotVis, revertedCompanionVis, revertedCompanionContent) =
+        var (mediaWithCompWidth, activeDotVis, compVis, compOpacity, compRectInMain, mainSize, compTextCount, isWorkingSweep) =
             await host.RunAsync(() =>
             {
                 harness.IslandWindow.UpdateLayout();
+                var mainHost = (FrameworkElement)harness.IslandWindow.FindName("MainIslandSurfaceHost");
                 var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
                 var nowPlayingView = (NowPlayingCompactView)activePresenter.Content;
                 var dot = (FrameworkElement)nowPlayingView.FindName("PlayingAccentDot");
-                var companionHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
-                var companionPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
-                return (nowPlayingView.ActualWidth, dot.Visibility, companionHost.Visibility, companionPresenter.Content);
+                var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+                var compPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
+                var compView = (DeveloperCompactCompanionView)compPresenter.Content;
+
+                var topLeft = compHost.TranslatePoint(new Point(0, 0), mainHost);
+                var bottomRight = compHost.TranslatePoint(new Point(compHost.ActualWidth, compHost.ActualHeight), mainHost);
+                return (
+                    nowPlayingView.ActualWidth,
+                    dot.Visibility,
+                    compHost.Visibility,
+                    compHost.Opacity,
+                    new Rect(topLeft, bottomRight),
+                    new Size(mainHost.ActualWidth, mainHost.ActualHeight),
+                    CountDescendants<TextBlock>(compView),
+                    compView.IsWorkingSweepActive);
             });
 
-        revertedCompanionVis.Should().Be(Visibility.Collapsed);
-        revertedCompanionContent.Should().BeNull();
-        revertedDotVis.Should().Be(Visibility.Visible);
-        revertedMediaWidth.Should().BeApproximately(mediaOnlyWidth, 1.0);
+        activeDotVis.Should().Be(Visibility.Visible);
+        mediaWithCompWidth.Should().BeApproximately(mediaOnlyWidth, 1.0);
+        compVis.Should().Be(Visibility.Visible);
+        compOpacity.Should().BeApproximately(1.0, 0.05);
+        compRectInMain.Left.Should().BeApproximately(28.0, 1.0);
+        compRectInMain.Width.Should().BeApproximately(208.0, 1.0);
+        compRectInMain.Bottom.Should().BeLessOrEqualTo(mainSize.Height - 1.5);
+        compRectInMain.Bottom.Should().BeGreaterOrEqualTo(mainSize.Height - 5.0);
+        compTextCount.Should().Be(0);
+        isWorkingSweep.Should().BeTrue();
+        compHarness.DeveloperModule.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Working);
+        compHarness.DeveloperModule.ViewModel.BarFillBrushKey.Should().Be("AgentStatusWorkingBrush");
+
+        // Switch to Floating Pill mode -> bottom-edge bar stays cleanly inside rounded floating capsule bounds
+        await host.RunAsync(() => harness.IslandWindow.ApplyBehaviorPreferences(
+            MonitorSelectionMode.Primary, null, false, 350, 600, false,
+            IslandStyle.FloatingPill, lockIslandPosition: false, 0.0, null));
+        await Task.Delay(260);
+        await host.PumpAsync();
+
+        (await host.RunAsync(() =>
+        {
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            return compHost.Visibility;
+        })).Should().Be(Visibility.Visible);
+
+        // 3. Expanding hides bar smoothly; collapsing back restores it
+        await host.RunAsync(() => harness.StateManager.RequestUserExpand());
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        (await host.RunAsync(() => ((FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost")).Visibility))
+            .Should().Be(Visibility.Collapsed);
+
+        await host.RunAsync(() => harness.StateManager.RequestUserCollapse());
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        (await host.RunAsync(() => ((FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost")).Visibility))
+            .Should().Be(Visibility.Visible);
+
+        // 4. Finished disappears right away (no lingering Finished dwell) while Now Playing stays intact
+        compHarness.EmitDeveloperSession(AgentStatus.Finished, isFatalError: false);
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        harness.StateManager.CurrentState.Should().Be(IslandShellState.Active);
+        harness.StateManager.CompactActiveWidgetId.Should().Be(NowPlayingWidgetModule.Id);
+        harness.StateManager.CompactCompanionWidgetId.Should().BeNull();
+        compHarness.DeveloperModule.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
+
+        var (finishedVis, finishedContent, finishedDotVis) = await host.RunAsync(() =>
+        {
+            var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
+            var nowPlayingView = (NowPlayingCompactView)activePresenter.Content;
+            var dot = (FrameworkElement)nowPlayingView.FindName("PlayingAccentDot");
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            var compPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
+            return (compHost.Visibility, compPresenter.Content, dot.Visibility);
+        });
+        finishedVis.Should().Be(Visibility.Collapsed);
+        finishedContent.Should().BeNull();
+        finishedDotVis.Should().Be(Visibility.Visible);
+
+        // 5. NeedsAttention / AwaitingApproval holds static amber bar alongside Now Playing (no sweep) until Developer viewed
+        compHarness.EmitDeveloperSession(AgentStatus.AwaitingApproval, isFatalError: false);
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        await host.RunAsync(() => harness.StateManager.ClearNotificationPeek());
+        await host.PumpAsync();
+
+        harness.StateManager.CompactActiveWidgetId.Should().Be(NowPlayingWidgetModule.Id);
+        harness.StateManager.CompactCompanionWidgetId.Should().Be(DeveloperWidgetModule.Id);
+        var (attnVis, attnSweep, attnBrushKey, attnColorHex) = await host.RunAsync(() =>
+        {
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            var compPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
+            var compView = (DeveloperCompactCompanionView)compPresenter.Content;
+            var bar = (ProgressBar)compView.FindName("CompanionProgressBar");
+            var brush = (System.Windows.Media.SolidColorBrush)bar.Foreground;
+            return (compHost.Visibility, compView.IsWorkingSweepActive, compHarness.DeveloperModule.ViewModel.BarFillBrushKey, brush.Color.ToString());
+        });
+        attnVis.Should().Be(Visibility.Visible);
+        attnSweep.Should().BeFalse();
+        attnBrushKey.Should().Be("AgentStatusAttentionBrush");
+        attnColorHex.Should().Be("#FFF59E0B");
+
+        // Viewing Developer Activity (ActivateAsync) clears the alert hold immediately
+        await compHarness.DeveloperModule.ActivateAsync(WidgetActivationReason.UserSelection);
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        harness.StateManager.CompactCompanionWidgetId.Should().BeNull();
+        (await host.RunAsync(() => ((FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost")).Visibility))
+            .Should().Be(Visibility.Collapsed);
+
+        // 6. ErrorFailed holds static red bar alongside Now Playing until fallback timeout expires
+        compHarness.EmitDeveloperSession(AgentStatus.NeedsAttention, isFatalError: true);
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        var (errVis, errSweep, errBrushKey) = await host.RunAsync(() =>
+        {
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            var compPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
+            var compView = (DeveloperCompactCompanionView)compPresenter.Content;
+            return (compHost.Visibility, compView.IsWorkingSweepActive, compHarness.DeveloperModule.ViewModel.BarFillBrushKey);
+        });
+        errVis.Should().Be(Visibility.Visible);
+        errSweep.Should().BeFalse();
+        errBrushKey.Should().Be("AgentStatusErrorBrush");
+
+        compHarness.DeveloperModule.ViewModel.TriggerAlertTimeoutExpiredForTesting();
+        await Task.Delay(240);
+        await host.PumpAsync();
+
+        harness.StateManager.CompactCompanionWidgetId.Should().BeNull();
+        (await host.RunAsync(() => ((FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost")).Visibility))
+            .Should().Be(Visibility.Collapsed);
     }
 
     [Fact]
@@ -356,36 +428,471 @@ public sealed class IslandShellUiTests
         compHarness.EmitDeveloperSession(AgentStatus.Working, isFatalError: false);
         await host.PumpAsync();
 
-        var (openWidth, openVis, openDotVis) = await host.RunAsync(() =>
+        var (openVis, openOpacity, openDotVis, sweepActive) = await host.RunAsync(() =>
         {
             var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
             var nowPlayingView = (NowPlayingCompactView)activePresenter.Content;
             var dot = (FrameworkElement)nowPlayingView.FindName("PlayingAccentDot");
-            var companionHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
-            return (companionHost.ActualWidth, companionHost.Visibility, dot.Visibility);
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            var compView = (DeveloperCompactCompanionView)((ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter")).Content;
+            return (compHost.Visibility, compHost.Opacity, dot.Visibility, compView.IsWorkingSweepActive);
         });
 
         openVis.Should().Be(Visibility.Visible);
-        openWidth.Should().BeGreaterThan(25.0);
-        openDotVis.Should().Be(Visibility.Collapsed);
+        openOpacity.Should().Be(1.0);
+        openDotVis.Should().Be(Visibility.Visible);
+        sweepActive.Should().BeFalse();
 
+        // Finished clears immediately in zero duration
         compHarness.EmitDeveloperSession(AgentStatus.Finished, isFatalError: false);
-        compHarness.DeveloperModule.OnCollapsedNotchHovered();
-        await host.PumpAsync(); // Single pump with zero animation delay
+        await host.PumpAsync();
 
         var (closedVis, closedContent, closedDotVis) = await host.RunAsync(() =>
         {
             var activePresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCustomContentPresenter");
             var nowPlayingView = (NowPlayingCompactView)activePresenter.Content;
             var dot = (FrameworkElement)nowPlayingView.FindName("PlayingAccentDot");
-            var companionHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
-            var companionPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
-            return (companionHost.Visibility, companionPresenter.Content, dot.Visibility);
+            var compHost = (FrameworkElement)harness.IslandWindow.FindName("ActiveCompanionHost");
+            var compPresenter = (ContentPresenter)harness.IslandWindow.FindName("ActiveCompanionContentPresenter");
+            return (compHost.Visibility, compPresenter.Content, dot.Visibility);
         });
 
         closedVis.Should().Be(Visibility.Collapsed);
         closedContent.Should().BeNull();
         closedDotVis.Should().Be(Visibility.Visible);
+    }
+
+    [Fact]
+    public async Task IslandWindow_StyleSwitchHoverLiftAndSettings_MorphsSmoothlyAndSnapsUnderReducedMotion()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "shima-style-ui-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            using var host = new StaWpfTestHost();
+            var reducedMotion = false;
+            await using var harness = await host.RunAsync(() =>
+            {
+                var h = CreateHarness(host, reducedMotion: false);
+                h.PowerMonitor.IsReducedMotionEnabled.Returns(_ => reducedMotion);
+                return h;
+            });
+
+            var prefsStore = new AppPreferencesStore(new AtomicConfigStore<AppPreferences>(tempDir));
+            var prefsService = new AppPreferencesService(prefsStore, new DpapiSecretStore());
+            await prefsService.InitializeAsync();
+
+            var settingsWindow = await host.RunAsync(() =>
+            {
+                prefsService.PreferencesChanged += (_, updated) => harness.IslandWindow.Dispatcher.BeginInvoke(() =>
+                    harness.IslandWindow.ApplyBehaviorPreferences(
+                        updated.MonitorSelectionMode,
+                        updated.SpecificMonitorDeviceId,
+                        updated.ExpandOnHover,
+                        updated.HoverExpandDelayMs,
+                        updated.AutoCollapseDelayMs,
+                        updated.FullscreenBreakthroughAlerts,
+                        updated.IslandStyle,
+                        updated.LockIslandPosition,
+                        updated.IslandOffsetXDip,
+                        updated.IslandFloatingTopOffsetDip));
+
+                var colorService = new ColorProcessingService();
+                var appearanceRepo = new AtomicAppearanceConfigRepository(new AtomicConfigStore<AppearanceConfiguration>(tempDir));
+                var presetRepo = new AtomicPresetCatalogRepository(new AtomicConfigStore<PresetCatalog>(tempDir));
+                var presets = new PresetManager(presetRepo, colorService);
+                var themeManager = new AppearanceManager(appearanceRepo, presets, colorService, harness.PinController);
+                var sw = new SettingsWindow(
+                    themeManager,
+                    presets,
+                    colorService,
+                    prefsService,
+                    new DiagnosticLogService(Path.Combine(tempDir, "logs")));
+
+                harness.IslandWindow.Show();
+                sw.Show();
+                return sw;
+            });
+            await host.PumpAsync();
+
+            try
+            {
+                // Initial Docked Notch: Y flush with WorkArea.Top, floatingProgress = 0, no shadow
+                var initialVisual = await host.RunAsync(() => (
+                    harness.IslandWindow.CurrentIslandStyle,
+                    harness.IslandWindow.CurrentFloatingProgress,
+                    harness.IslandWindow.CurrentShadowOpacity,
+                    harness.IslandWindow.CurrentVisualBoundsDip));
+                initialVisual.CurrentIslandStyle.Should().Be(IslandStyle.DockedNotch);
+                initialVisual.CurrentFloatingProgress.Should().Be(0.0);
+                initialVisual.CurrentShadowOpacity.Should().Be(0.0);
+                initialVisual.CurrentVisualBoundsDip.Top.Should().BeApproximately(
+                    IslandPositionMath.GetEffectiveWorkArea(harness.PrimaryMonitor).Top / harness.PrimaryMonitor.DpiScale,
+                    0.5);
+
+                // Toggle to Floating Pill via Settings ComboBox -> live morph completes cleanly
+                await host.RunAsync(() =>
+                {
+                    var styleCombo = (ComboBox)settingsWindow.FindName("IslandStyleCombo");
+                    styleCombo.SelectedIndex = 1; // FloatingPill
+                });
+                await Task.Delay(320);
+                await host.PumpAsync();
+
+                prefsService.Current.IslandStyle.Should().Be(IslandStyle.FloatingPill);
+                var floatingVisual = await host.RunAsync(() => (
+                    harness.IslandWindow.CurrentIslandStyle,
+                    harness.IslandWindow.CurrentFloatingProgress,
+                    harness.IslandWindow.CurrentShadowOpacity,
+                    harness.IslandWindow.CurrentVisualBoundsDip,
+                    (System.Windows.Shapes.Path)harness.IslandWindow.FindName("NotchSurfacePath")));
+
+                floatingVisual.CurrentIslandStyle.Should().Be(IslandStyle.FloatingPill);
+                floatingVisual.CurrentFloatingProgress.Should().BeApproximately(1.0, 0.01);
+                floatingVisual.CurrentShadowOpacity.Should().BeGreaterThan(0.25);
+                var workTopDip = IslandPositionMath.GetEffectiveWorkArea(harness.PrimaryMonitor).Top / harness.PrimaryMonitor.DpiScale;
+                floatingVisual.CurrentVisualBoundsDip.Top.Should().BeApproximately(
+                    workTopDip + IslandPositionMath.DefaultFloatingTopMarginDip,
+                    0.5);
+                floatingVisual.CurrentVisualBoundsDip.Width.Should().BeApproximately(
+                    ConcaveNotchGeometryBuilder.CollapsedSpec.WidthDip - 2 * ConcaveNotchGeometryBuilder.CollapsedSpec.EarRadiusDip,
+                    0.5);
+
+                // Verify Floating hover lift elevates on pointer enter and settles on leave
+                await host.RunAsync(() => harness.IslandWindow.SetHoveringForTesting(true));
+                await Task.Delay(220);
+                await host.PumpAsync();
+
+                var hoveredLift = await host.RunAsync(() => (
+                    harness.IslandWindow.CurrentLiftScale,
+                    harness.IslandWindow.CurrentShadowOpacity));
+                hoveredLift.CurrentLiftScale.Should().BeApproximately(1.02, 0.005);
+                hoveredLift.CurrentShadowOpacity.Should().BeApproximately(0.44, 0.02);
+
+                await host.RunAsync(() => harness.IslandWindow.SetHoveringForTesting(false));
+                await Task.Delay(220);
+                await host.PumpAsync();
+
+                (await host.RunAsync(() => harness.IslandWindow.CurrentLiftScale)).Should().BeApproximately(1.0, 0.005);
+
+                // Toggle Lock Position & click Reset Position inside Settings
+                await host.RunAsync(() =>
+                {
+                    var lockCheck = (CheckBox)settingsWindow.FindName("LockIslandPositionCheck");
+                    lockCheck.IsChecked = true;
+                });
+                var lockDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+                while (!prefsService.Current.LockIslandPosition && DateTime.UtcNow < lockDeadline)
+                {
+                    await Task.Delay(15);
+                }
+                prefsService.Current.LockIslandPosition.Should().BeTrue();
+
+                // Interrupted morph: Floating -> Docked, then immediately back to Floating mid-flight (0 stuck state)
+                await host.RunAsync(() =>
+                {
+                    var styleCombo = (ComboBox)settingsWindow.FindName("IslandStyleCombo");
+                    styleCombo.SelectedIndex = 0; // Docked
+                });
+                await Task.Delay(60);
+                await host.PumpAsync();
+                await host.RunAsync(() =>
+                {
+                    var styleCombo = (ComboBox)settingsWindow.FindName("IslandStyleCombo");
+                    styleCombo.SelectedIndex = 1; // Flip back mid-flight
+                });
+                await Task.Delay(320);
+                await host.PumpAsync();
+
+                (await host.RunAsync(() => (
+                    harness.IslandWindow.CurrentFloatingProgress,
+                    harness.IslandWindow.IsMotionAnimationActive))).Should().Be((1.0, false));
+
+                // Under Reduced Motion, switching Docked <-> Floating snaps immediately with zero transition timer
+                reducedMotion = true;
+                await host.RunAsync(() =>
+                {
+                    var styleCombo = (ComboBox)settingsWindow.FindName("IslandStyleCombo");
+                    styleCombo.SelectedIndex = 0;
+                });
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+                while (prefsService.Current.IslandStyle != IslandStyle.DockedNotch && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(15);
+                }
+                await host.PumpAsync();
+
+                var snappedDocked = await host.RunAsync(() => (
+                    harness.IslandWindow.CurrentFloatingProgress,
+                    harness.IslandWindow.CurrentShadowOpacity,
+                    harness.IslandWindow.IsMotionAnimationActive));
+                snappedDocked.CurrentFloatingProgress.Should().Be(0.0);
+                snappedDocked.CurrentShadowOpacity.Should().Be(0.0);
+                snappedDocked.IsMotionAnimationActive.Should().BeFalse();
+
+                // Direct ApplyBehaviorPreferences also snaps synchronously in 0ms under Reduced Motion
+                await host.RunAsync(() =>
+                {
+                    harness.IslandWindow.ApplyBehaviorPreferences(
+                        MonitorSelectionMode.Primary, null, false, 350, 600, false,
+                        IslandStyle.FloatingPill, lockIslandPosition: false, 0.0, null);
+                    harness.IslandWindow.CurrentFloatingProgress.Should().Be(1.0);
+                    harness.IslandWindow.IsMotionAnimationActive.Should().BeFalse();
+                });
+            }
+            finally
+            {
+                await host.RunAsync(() => settingsWindow.Close());
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task IslandWindow_DragClampingMagneticSnapLockAndReset_OperatesCleanlyAcrossModes()
+    {
+        using var host = new StaWpfTestHost();
+        await using var harness = await host.RunAsync(() => CreateHarness(host, reducedMotion: false));
+
+        var committedEvents = new List<IslandPositionCommittedEventArgs>();
+        await host.RunAsync(() =>
+        {
+            harness.IslandWindow.PositionCommitted += (_, pos) => committedEvents.Add(pos);
+            harness.IslandWindow.Show();
+        });
+        await host.PumpAsync();
+
+        // 1. Sub-threshold gesture (< 5 DIP) does NOT move or commit position
+        await host.RunAsync(() => harness.IslandWindow.SimulateDragGestureForTesting(3.0, 2.0));
+        await host.PumpAsync();
+        committedEvents.Should().BeEmpty();
+
+        // 2. Docked Notch drag constrains to horizontal top edge only
+        await host.RunAsync(() => harness.IslandWindow.SimulateDragGestureForTesting(140.0, 250.0));
+        await Task.Delay(250);
+        await host.PumpAsync();
+
+        committedEvents.Should().ContainSingle();
+        committedEvents[^1].OffsetXDip.Should().BeApproximately(140.0, 1.0);
+        committedEvents[^1].FloatingTopOffsetDip.Should().BeNull();
+        var workTopDip = IslandPositionMath.GetEffectiveWorkArea(harness.PrimaryMonitor).Top / harness.PrimaryMonitor.DpiScale;
+        (await host.RunAsync(() => harness.IslandWindow.CurrentVisualBoundsDip.Top)).Should().BeApproximately(workTopDip, 0.5);
+
+        // 3. Drop within 16 DIP of center snaps magnetically back to 0.0 with ease-out glide
+        await host.RunAsync(() => harness.IslandWindow.SimulateDragGestureForTesting(-130.0, 0.0)); // lands at +10 DIP <= 16
+        await Task.Delay(260);
+        await host.PumpAsync();
+        committedEvents.Should().HaveCount(2);
+        committedEvents[^1].OffsetXDip.Should().Be(0.0);
+
+        // 4. Floating Pill allows free X/Y drag inside work area, Lock prevents drag, ResetPosition glides to center
+        await host.RunAsync(() => harness.IslandWindow.ApplyBehaviorPreferences(
+            MonitorSelectionMode.Primary, null, false, 350, 600, false,
+            IslandStyle.FloatingPill, lockIslandPosition: false, 0.0, null));
+        await Task.Delay(300);
+        await host.PumpAsync();
+
+        await host.RunAsync(() => harness.IslandWindow.SimulateDragGestureForTesting(180.0, 140.0));
+        await Task.Delay(260);
+        await host.PumpAsync();
+
+        committedEvents.Should().HaveCount(3);
+        committedEvents[^1].OffsetXDip.Should().BeApproximately(180.0, 1.0);
+        committedEvents[^1].FloatingTopOffsetDip.Should().BeApproximately(IslandPositionMath.DefaultFloatingTopMarginDip + 140.0, 1.0);
+
+        // Lock position ignores subsequent drags
+        await host.RunAsync(() => harness.IslandWindow.ApplyBehaviorPreferences(
+            MonitorSelectionMode.Primary, null, false, 350, 600, false,
+            IslandStyle.FloatingPill, lockIslandPosition: true, committedEvents[^1].OffsetXDip, committedEvents[^1].FloatingTopOffsetDip));
+        await host.PumpAsync();
+        var countBeforeLocked = committedEvents.Count;
+        await host.RunAsync(() => harness.IslandWindow.SimulateDragGestureForTesting(-120.0, -80.0));
+        await host.PumpAsync();
+        committedEvents.Count.Should().Be(countBeforeLocked);
+
+        // ResetPosition glides cleanly back to default top-center (0, null) and emits exactly once
+        await host.RunAsync(() => harness.IslandWindow.ResetPosition());
+        await Task.Delay(260);
+        await host.PumpAsync();
+        committedEvents.Should().HaveCount(4);
+        committedEvents[^1].Should().Be(new IslandPositionCommittedEventArgs(0.0, null));
+
+        // 5. Capture-loss release re-entrancy commits PositionCommitted strictly once
+        await host.RunAsync(() =>
+        {
+            harness.IslandWindow.ApplyBehaviorPreferences(
+                MonitorSelectionMode.Primary, null, false, 350, 600, false,
+                IslandStyle.FloatingPill, lockIslandPosition: false, 0.0, null);
+        });
+        await Task.Delay(200);
+        await host.PumpAsync();
+        var countBeforeReentryCheck = committedEvents.Count;
+        await host.RunAsync(() =>
+        {
+            harness.IslandWindow.SimulateDragGestureForTesting(60.0, 40.0, completeDrop: false);
+            harness.IslandWindow.CaptureMouse();
+            harness.IslandWindow.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent
+            });
+        });
+        await Task.Delay(240);
+        await host.PumpAsync();
+        committedEvents.Should().HaveCount(countBeforeReentryCheck + 1);
+        committedEvents[^1].OffsetXDip.Should().BeApproximately(60.0, 1.0);
+        committedEvents[^1].FloatingTopOffsetDip.Should().BeApproximately(IslandPositionMath.DefaultFloatingTopMarginDip + 40.0, 1.0);
+
+        // 6. Edge/bottom parked Floating Pill expands into safe bounds without clipping off-screen
+        await host.RunAsync(() => harness.IslandWindow.SimulateDragGestureForTesting(5000.0, 5000.0));
+        await Task.Delay(260);
+        await host.PumpAsync();
+
+        await host.RunAsync(() => harness.StateManager.RequestUserExpand());
+        await Task.Delay(300);
+        await host.PumpAsync();
+
+        var workArea = IslandPositionMath.GetEffectiveWorkArea(harness.PrimaryMonitor);
+        var scale = IslandPositionMath.GetEffectiveDpiScale(harness.PrimaryMonitor.DpiScale);
+        var expandedRect = await host.RunAsync(() => harness.IslandWindow.CurrentVisualBoundsDip);
+        (expandedRect.Left * scale).Should().BeGreaterOrEqualTo(workArea.Left - 1.0);
+        (expandedRect.Right * scale).Should().BeLessOrEqualTo(workArea.Right + 1.0);
+        (expandedRect.Top * scale).Should().BeGreaterOrEqualTo(workArea.Top - 1.0);
+        (expandedRect.Bottom * scale).Should().BeLessOrEqualTo(workArea.Bottom + 1.0);
+    }
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.5)]
+    [InlineData(2.0)]
+    public async Task IslandWindow_HitTestAndNcHitTest_PassClicksAroundFloatingCapsuleAndBelowSubPillAcrossDpi(double dpiScale)
+    {
+        using var host = new StaWpfTestHost();
+        await using var harness = await host.RunAsync(() =>
+        {
+            var customMonitor = new MonitorInfo(
+                0x101,
+                @"\\.\DISPLAY1",
+                new MonitorBounds(0, 0, 1920, 1080),
+                new MonitorBounds(0, 0, 1920, 1032),
+                dpiScale,
+                true);
+
+            var displayMonitor = Substitute.For<IDisplayTopologyMonitor>();
+            displayMonitor.GetMonitors().Returns([customMonitor]);
+            displayMonitor.GetPrimaryMonitor().Returns(customMonitor);
+            displayMonitor.ResolveTargetMonitor(Arg.Any<MonitorSelectionMode>(), Arg.Any<string?>()).Returns(customMonitor);
+
+            var fullscreenDetector = Substitute.For<IFullscreenDetector>();
+            fullscreenDetector.IsMonitorFullscreen(Arg.Any<nint>()).Returns(false);
+            var hotkeyService = Substitute.For<IGlobalHotkeyService>();
+            var powerMonitor = Substitute.For<IPowerAndMotionMonitor>();
+            powerMonitor.CurrentPowerProfile.Returns(PowerProfile.AC);
+            powerMonitor.IsReducedMotionEnabled.Returns(true);
+            powerMonitor.IsSessionLocked.Returns(false);
+
+            var pinController = new OverlayPinController();
+            var stateManager = new IslandStateManager(pinController);
+            var islandWindow = new IslandWindow(
+                stateManager,
+                pinController,
+                new OverlayWindowAdapter(),
+                displayMonitor,
+                fullscreenDetector,
+                hotkeyService,
+                powerMonitor);
+            islandWindow.ApplyBehaviorPreferences(
+                MonitorSelectionMode.Primary, null, false, 350, 600, false,
+                IslandStyle.FloatingPill, lockIslandPosition: false, 0.0, null);
+            return new UiTestHarness(
+                host,
+                customMonitor,
+                pinController,
+                stateManager,
+                fullscreenDetector,
+                hotkeyService,
+                powerMonitor,
+                islandWindow,
+                new Window { Width = 200, Height = 120, ShowInTaskbar = false });
+        });
+        await using var compHarness = await CreateMediaAndDeveloperHarnessAsync(harness);
+
+        await host.RunAsync(() => harness.IslandWindow.Show());
+        compHarness.EmitMediaPlaying("Midnight City", "M83");
+        compHarness.EmitDeveloperSession(AgentStatus.Working, isFatalError: false);
+        await host.PumpAsync();
+
+        var hitResults = await host.RunAsync(() =>
+        {
+            harness.IslandWindow.UpdateLayout();
+            var mainHost = (FrameworkElement)harness.IslandWindow.FindName("MainIslandSurfaceHost");
+
+            var mainCenter = mainHost.TranslatePoint(new Point(mainHost.ActualWidth * 0.5, mainHost.ActualHeight * 0.5), harness.IslandWindow);
+            var bottomBarPoint = mainHost.TranslatePoint(new Point(mainHost.ActualWidth * 0.5, mainHost.ActualHeight - 3.0), harness.IslandWindow);
+            var outerShadowLeft = new Point(2.0, mainCenter.Y);
+            var outerBottomBelowPill = new Point(mainCenter.X, mainHost.TranslatePoint(new Point(0, mainHost.ActualHeight), harness.IslandWindow).Y + 4.0);
+
+            var hwnd = harness.IslandWindow.WindowHandle;
+            var rectOk = GetWindowRect(hwnd, out var winRect);
+            rectOk.Should().BeTrue();
+
+            static nint PackScreenPoint(int x, int y) => unchecked((nint)(((y & 0xFFFF) << 16) | (x & 0xFFFF)));
+            const int WmNcHitTest = 0x0084;
+
+            var ncOuterBottomResult = SendMessageW(
+                hwnd,
+                WmNcHitTest,
+                0,
+                PackScreenPoint(
+                    winRect.Left + (int)Math.Round(outerBottomBelowPill.X * dpiScale),
+                    winRect.Top + (int)Math.Round(outerBottomBelowPill.Y * dpiScale)));
+            var ncMainResult = SendMessageW(
+                hwnd,
+                WmNcHitTest,
+                0,
+                PackScreenPoint(
+                    winRect.Left + (int)Math.Round(mainCenter.X * dpiScale),
+                    winRect.Top + (int)Math.Round(mainCenter.Y * dpiScale)));
+
+            return (
+                HitMain: harness.IslandWindow.HitTestInteractiveSurfaceDip(mainCenter),
+                HitBottomBarArea: harness.IslandWindow.HitTestInteractiveSurfaceDip(bottomBarPoint),
+                HitOuterMargin: harness.IslandWindow.HitTestInteractiveSurfaceDip(outerShadowLeft),
+                HitOuterBottom: harness.IslandWindow.HitTestInteractiveSurfaceDip(outerBottomBelowPill),
+                NcOuterBottomResult: ncOuterBottomResult,
+                NcMainResult: ncMainResult);
+        });
+
+        hitResults.HitMain.Should().BeTrue();
+        hitResults.HitBottomBarArea.Should().BeTrue();
+        hitResults.HitOuterMargin.Should().BeFalse();
+        hitResults.HitOuterBottom.Should().BeFalse();
+        hitResults.NcOuterBottomResult.Should().Be((nint)(-1)); // HTTRANSPARENT
+        hitResults.NcMainResult.Should().NotBe((nint)(-1));
+    }
+
+    private static int CountDescendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = 0;
+        var children = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < children; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T)
+            {
+                count++;
+            }
+
+            count += CountDescendants<T>(child);
+        }
+
+        return count;
     }
 
     private static UiTestHarness CreateHarness(StaWpfTestHost host, bool reducedMotion = true)
@@ -451,6 +958,7 @@ public sealed class IslandShellUiTests
             stateManager,
             fullscreenDetector,
             hotkeyService,
+            powerMonitor,
             islandWindow,
             hostWindow);
     }
@@ -465,6 +973,22 @@ public sealed class IslandShellUiTests
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(nint hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern nint SendMessageW(nint hWnd, int msg, nint wParam, nint lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     private sealed class UiTestHarness(
         StaWpfTestHost host,
         MonitorInfo primaryMonitor,
@@ -472,6 +996,7 @@ public sealed class IslandShellUiTests
         IslandStateManager stateManager,
         IFullscreenDetector fullscreenDetector,
         IGlobalHotkeyService hotkeyService,
+        IPowerAndMotionMonitor powerMonitor,
         IslandWindow islandWindow,
         Window hostWindow) : IAsyncDisposable
     {
@@ -484,6 +1009,8 @@ public sealed class IslandShellUiTests
         public IFullscreenDetector FullscreenDetector { get; } = fullscreenDetector;
 
         public IGlobalHotkeyService HotkeyService { get; } = hotkeyService;
+
+        public IPowerAndMotionMonitor PowerMonitor { get; } = powerMonitor;
 
         public IslandWindow IslandWindow { get; } = islandWindow;
 

@@ -20,6 +20,8 @@ internal interface IWin32OverlayOperations
     nint GetForegroundWindow();
 
     bool SetForegroundWindow(nint hwnd);
+
+    bool TryGetCursorPos(out int x, out int y);
 }
 
 internal sealed class Win32OverlayOperations : IWin32OverlayOperations
@@ -50,6 +52,20 @@ internal sealed class Win32OverlayOperations : IWin32OverlayOperations
     public nint GetForegroundWindow() => PInvoke.GetForegroundWindow().Value;
 
     public bool SetForegroundWindow(nint hwnd) => PInvoke.SetForegroundWindow(new HWND(hwnd));
+
+    public bool TryGetCursorPos(out int x, out int y)
+    {
+        if (PInvoke.GetCursorPos(out var pt))
+        {
+            x = pt.X;
+            y = pt.Y;
+            return true;
+        }
+
+        x = 0;
+        y = 0;
+        return false;
+    }
 }
 
 public sealed class OverlayWindowAdapter : IOverlayWindowAdapter
@@ -188,6 +204,24 @@ public sealed class OverlayWindowAdapter : IOverlayWindowAdapter
             pixelRect.Height,
             SwpNoActivate);
     }
+
+    public void SetPixelRect(nint hwnd, MonitorBounds pixelRect)
+    {
+        ValidateHwnd(hwnd);
+        _boundHwnd = hwnd;
+
+        _ops.SetWindowPos(
+            hwnd,
+            HwndTopmost,
+            pixelRect.Left,
+            pixelRect.Top,
+            Math.Max(1, pixelRect.Width),
+            Math.Max(1, pixelRect.Height),
+            SwpNoActivate);
+    }
+
+    public bool TryGetCursorScreenPosition(out int pixelX, out int pixelY) =>
+        _ops.TryGetCursorPos(out pixelX, out pixelY);
 
     public void ReassertTopmostZOrder(nint hwnd)
     {

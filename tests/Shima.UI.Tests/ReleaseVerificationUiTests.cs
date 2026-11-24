@@ -18,6 +18,7 @@ using Shima.Core.Appearance;
 using Shima.Core.Color;
 using Shima.Core.Contracts;
 using Shima.Core.Shell;
+using Shima.Core.Widgets;
 using Shima.Infrastructure.Appearance;
 using Shima.Infrastructure.Color;
 using Shima.Infrastructure.Configuration;
@@ -30,10 +31,20 @@ using Shima.Presentation.Settings;
 using Shima.Presentation.Theming;
 using Shima.Widgets.Clipboard;
 using Shima.Widgets.Clipboard.Views;
+using Shima.Widgets.Clock;
+using Shima.Widgets.Clock.Views;
+using Shima.Widgets.Developer;
+using Shima.Widgets.Developer.Views;
+using Shima.Widgets.FocusTimer;
+using Shima.Widgets.FocusTimer.Views;
 using Shima.Widgets.Inbox;
 using Shima.Widgets.Inbox.Views;
 using Shima.Widgets.Notes;
 using Shima.Widgets.Notes.Views;
+using Shima.Widgets.NowPlaying;
+using Shima.Widgets.NowPlaying.Views;
+using Shima.Widgets.VolumeMixer;
+using Shima.Widgets.VolumeMixer.Views;
 using Shima.WindowsInterop.Clipboard;
 using Shima.WindowsInterop.Notifications;
 using Shima.WindowsInterop.Overlay;
@@ -305,9 +316,9 @@ public sealed class ReleaseVerificationUiTests
                     {
                         Source = new Uri("/Shima.Presentation;component/Theming/ThemeTokens.xaml", UriKind.Relative)
                     };
-                    if (Application.Current is not null
-                        && !Application.Current.Resources.MergedDictionaries.Any(d => d.Source == themeDict.Source))
+                    if (Application.Current is not null)
                     {
+                        Application.Current.Resources.MergedDictionaries.Clear();
                         Application.Current.Resources.MergedDictionaries.Add(themeDict);
                     }
 
@@ -541,6 +552,264 @@ public sealed class ReleaseVerificationUiTests
         }
     }
 
+    [Fact]
+    public async Task AllWidgets_OpenSettingsButtons_AndSettingsWindowConfigureButtons_RouteCleanlyWithoutCrash()
+    {
+        var rootDir = IoPath.Combine(IoPath.GetTempPath(), "shima-widget-settings-routing-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(rootDir);
+
+        try
+        {
+            var dbPath = IoPath.Combine(rootDir, "shima.db");
+            var migrations = new SqliteMigrationRunner(dbPath);
+            await migrations.InitializeAsync();
+
+            var prefsStore = new AppPreferencesStore(new AtomicConfigStore<AppPreferences>(rootDir));
+            var prefsService = new AppPreferencesService(prefsStore, new DpapiSecretStore());
+            await prefsService.InitializeAsync();
+
+            var colorService = new ColorProcessingService();
+            var pinController = new OverlayPinController();
+            var presetManager = new PresetManager(
+                new AtomicPresetCatalogRepository(new AtomicConfigStore<PresetCatalog>(rootDir)),
+                colorService);
+            var appearanceManager = new AppearanceManager(
+                new AtomicAppearanceConfigRepository(new AtomicConfigStore<AppearanceConfiguration>(rootDir)),
+                presetManager,
+                colorService,
+                pinController);
+            await appearanceManager.InitializeAsync();
+            var diagService = new DiagnosticLogService(IoPath.Combine(rootDir, "logs"));
+
+            var events = new InMemoryEventDispatcher();
+            using var stateManager = new IslandStateManager(pinController);
+            var attentionRequester = new IslandAttentionRequester(stateManager);
+            var logger = Substitute.For<ILogger>();
+
+            var mediaAdapter = Substitute.For<IMediaSessionAdapter>();
+            var audioAdapter = Substitute.For<IAudioMixerAdapter>();
+            audioAdapter.CurrentSnapshot.Returns(AudioMixerSnapshot.Unavailable);
+            var clipAdapter = Substitute.For<IClipboardMonitorAdapter>();
+            var inboxAdapter = Substitute.For<INotificationListenerAdapter>();
+            inboxAdapter.GetAccessStateAsync(Arg.Any<CancellationToken>()).Returns(NotificationAccessState.IdentityUnavailable);
+            inboxAdapter.GetCurrentToastSnapshotAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<OsNotificationDto>());
+            var zenAudio = Substitute.For<IZenAudioSynthAdapter>();
+            var zenDisplay = Substitute.For<IZenDisplayEffectAdapter>();
+
+            var faultLogMessages = new List<string>();
+            logger.When(l => l.Error(Arg.Any<string>(), Arg.Any<Exception?>()))
+                .Do(ci => faultLogMessages.Add($"{ci.Arg<string>()} -> {ci.Arg<Exception?>()}"));
+
+            var agentAdapter = Substitute.For<ICodingAgentAdapter>();
+            agentAdapter.AdapterId.Returns("opencode");
+            agentAdapter.DisplayName.Returns("OpenCode");
+            agentAdapter.ConnectionState.Returns(AgentConnectionState.Disconnected);
+            agentAdapter.Capabilities.Returns(new AgentCapabilities(false, true, false, true, false, []));
+            agentAdapter.CheckHealthAsync(Arg.Any<CancellationToken>())
+                .Returns(new AdapterHealthResult(AdapterHealthStatus.Disconnected, "Disabled"));
+
+            var registrations = new WidgetModuleRegistration[]
+            {
+                new(
+                    new WidgetDescriptor { WidgetId = ClockWidgetModule.Id, DisplayName = "Clock", DefaultOrder = 0, DefaultAccentHex = "#FFFFFF" },
+                    () => new ClockWidgetModule(new ClockRepository(dbPath))),
+                new(
+                    new WidgetDescriptor { WidgetId = NowPlayingWidgetModule.Id, DisplayName = "Now Playing", DefaultOrder = 1, RequiresBackgroundSubscription = true, SupportsCompactActiveState = true, DefaultAccentHex = "#34D399" },
+                    () => new NowPlayingWidgetModule(mediaAdapter)),
+                new(
+                    new WidgetDescriptor { WidgetId = FocusTimerWidgetModule.Id, DisplayName = "Focus Timer", DefaultOrder = 2, SupportsCompactActiveState = true, SupportsNotificationPeek = true, DefaultAccentHex = "#FB923C" },
+                    () => new FocusTimerWidgetModule(new FocusRepository(dbPath), zenAudio, zenDisplay)),
+                new(
+                    new WidgetDescriptor { WidgetId = NotesWidgetModule.Id, DisplayName = "Notes", DefaultOrder = 3, DefaultAccentHex = "#FBBF24" },
+                    () => new NotesWidgetModule(new NoteRepository(dbPath), clipAdapter)),
+                new(
+                    new WidgetDescriptor { WidgetId = InboxWidgetModule.Id, DisplayName = "Inbox", DefaultOrder = 4, RequiresBackgroundSubscription = true, SupportsNotificationPeek = true, DefaultAccentHex = "#F43F5E" },
+                    () => new InboxWidgetModule(inboxAdapter, new InboxRepository(dbPath, rootDir), prefsService)),
+                new(
+                    new WidgetDescriptor { WidgetId = ClipboardWidgetModule.Id, DisplayName = "Clipboard", DefaultOrder = 5, RequiresBackgroundSubscription = true, DefaultAccentHex = "#38BDF8" },
+                    () => new ClipboardWidgetModule(clipAdapter, new ClipboardRepository(dbPath, rootDir), prefsService)),
+                new(
+                    new WidgetDescriptor { WidgetId = VolumeMixerWidgetModule.Id, DisplayName = "Volume Mixer", DefaultOrder = 6, RequiresBackgroundSubscription = true, DefaultAccentHex = "#38BDF8" },
+                    () => new VolumeMixerWidgetModule(audioAdapter)),
+                new(
+                    new WidgetDescriptor { WidgetId = DeveloperWidgetModule.Id, DisplayName = "Developer Activity", DefaultOrder = 7, RequiresBackgroundSubscription = true, SupportsCompactActiveState = true, SupportsNotificationPeek = true, DefaultAccentHex = "#38BDF8" },
+                    () => new DeveloperWidgetModule([agentAdapter], new AgentSessionLogRepository(dbPath), prefsService))
+            };
+
+            var configRepo = new SqliteWidgetConfigRepository(dbPath);
+            using var host = new StaWpfTestHost();
+            await using var registry = new WidgetRegistry(registrations, configRepo, logger, events, appearanceManager, attentionRequester);
+            await host.RunAsync(() => registry.InitializeAsync());
+            var coordinator = new SimpleWidgetSettingsCoordinator(registry, configRepo);
+            var requestedSections = new List<string?>();
+            using var openSettingsSub = events.Subscribe<OpenSettingsRequestedEvent>(e => requestedSections.Add(e.SectionTag));
+
+            await host.RunAsync(() =>
+            {
+                var themeDict = new ResourceDictionary
+                {
+                    Source = new Uri("/Shima.Presentation;component/Theming/ThemeTokens.xaml", UriKind.Relative)
+                };
+                if (Application.Current is not null)
+                {
+                    Application.Current.Resources.MergedDictionaries.Clear();
+                    Application.Current.Resources.MergedDictionaries.Add(themeDict);
+                }
+
+                var themeRenderer = new ThemeRenderer(appearanceManager, colorService, Dispatcher.CurrentDispatcher);
+                themeRenderer.AttachResourceDictionary(themeDict);
+                themeRenderer.ApplyNow();
+
+                var settings = new SettingsWindow(
+                    appearanceManager,
+                    presetManager,
+                    colorService,
+                    prefsService,
+                    diagService,
+                    widgetCoordinator: coordinator,
+                    themeRenderer: themeRenderer)
+                {
+                    ShowInTaskbar = false,
+                    ShowActivated = false,
+                    Left = -20000,
+                    Top = -20000
+                };
+                settings.Show();
+                settings.UpdateLayout();
+
+                // 1. Trigger settings gear button inside every expanded widget view (including Now Playing both active and empty states)
+                var triggers = new (string WidgetId, string ButtonAutomationId, string ExpectedSectionTag, string ExpectedNavTag)[]
+                {
+                    (ClockWidgetModule.Id, "ClockOpenSettingsButton", "Clock", "Clock"),
+                    (NowPlayingWidgetModule.Id, "NowPlayingOpenSettingsButton", "Widgets:shima.music", "Widgets"),
+                    (NowPlayingWidgetModule.Id, "NowPlayingEmptyOpenSettingsButton", "Widgets:shima.music", "Widgets"),
+                    (FocusTimerWidgetModule.Id, "FocusSettingsButton", "FocusTimer", "FocusTimer"),
+                    (NotesWidgetModule.Id, "NotesOpenSettingsButton", "Widgets:shima.notes", "Widgets"),
+                    (InboxWidgetModule.Id, "InboxOpenSettingsButton", "Notifications", "Notifications"),
+                    (ClipboardWidgetModule.Id, "ClipboardOpenSettingsButton", "Clipboard", "Clipboard"),
+                    (VolumeMixerWidgetModule.Id, "VolumeMixerOpenSettingsButton", "Widgets:shima.mixer", "Widgets"),
+                    (DeveloperWidgetModule.Id, "DeveloperSettingsGearButton", "DeveloperIntegrations", "DeveloperIntegrations")
+                };
+
+                foreach (var (widgetId, buttonAutomationId, expectedSectionTag, expectedNavTag) in triggers)
+                {
+                    var rawExpanded = registry.CreateExpandedView(widgetId);
+                    if (rawExpanded is not UserControl expandedView)
+                    {
+                        throw new InvalidOperationException(
+                            $"Widget '{widgetId}' returned {rawExpanded?.GetType().Name}. Faults: {string.Join(" | ", faultLogMessages)}");
+                    }
+
+                    expandedView.Measure(new Size(348, 140));
+                    expandedView.Arrange(new Rect(0, 0, 348, 140));
+                    expandedView.UpdateLayout();
+
+                    var gearBtn = FindByAutomationId<Button>(expandedView, buttonAutomationId);
+                    requestedSections.Clear();
+                    gearBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, gearBtn));
+
+                    requestedSections.Should().ContainSingle($"widget '{widgetId}' button '{buttonAutomationId}' must publish OpenSettingsRequestedEvent").Which.Should().Be(expectedSectionTag);
+
+                    settings.SelectSection(expectedSectionTag);
+                    settings.UpdateLayout();
+
+                    var navRail = Find<ListBox>(settings, "NavigationRail");
+                    var selectedNav = navRail.SelectedItem.Should().BeOfType<ListBoxItem>().Subject;
+                    (selectedNav.Tag as string).Should().Be(expectedNavTag);
+                }
+
+                // 2. Verify NowPlaying, Notes, and VolumeMixer settings panels are hosted cleanly inside PanelWidgets
+                settings.SelectSection("Widgets");
+                settings.UpdateLayout();
+                Find<ContentPresenter>(settings, "NowPlayingSettingsHost").Content.Should().BeOfType<NowPlayingSettingsView>();
+                Find<ContentPresenter>(settings, "NotesSettingsHost").Content.Should().BeOfType<NotesSettingsView>();
+                Find<ContentPresenter>(settings, "VolumeMixerSettingsHost").Content.Should().BeOfType<VolumeMixerSettingsView>();
+
+                // 3. Verify clicking "Configure" on every row in the Settings -> Widgets list routes without throwing
+                foreach (var reg in registrations)
+                {
+                    settings.SelectSection("Widgets");
+                    settings.UpdateLayout();
+
+                    var configureBtn = FindByAutomationId<Button>(settings, $"ConfigureWidgetButton_{reg.Metadata.WidgetId}");
+                    configureBtn.IsEnabled.Should().BeTrue();
+                    configureBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, configureBtn));
+                    settings.UpdateLayout();
+                }
+
+                settings.Close();
+            });
+
+            // 4. Verify resetting settings for all 8 widgets while their settings views exist never throws cross-thread InvalidOperationException
+            foreach (var reg in registrations)
+            {
+                await registry.ResetSettingsAsync(reg.Metadata.WidgetId);
+            }
+
+            await host.PumpAsync();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(rootDir))
+            {
+                Directory.Delete(rootDir, recursive: true);
+            }
+        }
+    }
+
+    private sealed class SimpleWidgetSettingsCoordinator(WidgetRegistry registry, IWidgetConfigRepository repository)
+        : IWidgetSettingsCoordinator
+    {
+        private readonly Dictionary<string, object?> _cache = new(StringComparer.Ordinal);
+
+        public Task<IReadOnlyList<WidgetManagementItem>> GetWidgetsAsync(CancellationToken ct = default)
+        {
+            var items = registry.Widgets
+                .Select(w => new WidgetManagementItem(w.Metadata.WidgetId, w.Metadata.DisplayName, w.IsEnabled, w.SortOrder, w.IsFaulted))
+                .OrderBy(w => w.SortOrder)
+                .ToArray();
+            return Task.FromResult<IReadOnlyList<WidgetManagementItem>>(items);
+        }
+
+        public Task SetEnabledAsync(string widgetId, bool isEnabled, CancellationToken ct = default)
+        {
+            if (!isEnabled)
+            {
+                _cache.Remove(widgetId);
+            }
+
+            return registry.SetEnabledAsync(widgetId, isEnabled, ct);
+        }
+
+        public Task ResetSettingsAsync(string widgetId, CancellationToken ct = default) =>
+            registry.ResetSettingsAsync(widgetId, ct);
+
+        public Task UpdateOrderAsync(IReadOnlyList<string> orderedWidgetIds, CancellationToken ct = default) =>
+            repository.UpdateOrderAsync(orderedWidgetIds);
+
+        public object? CreateSettingsView(string widgetId)
+        {
+            var state = registry.Widgets.FirstOrDefault(w => string.Equals(w.Metadata.WidgetId, widgetId, StringComparison.Ordinal));
+            if (state is null || !state.IsEnabled || state.IsFaulted)
+            {
+                _cache.Remove(widgetId);
+                return null;
+            }
+
+            if (_cache.TryGetValue(widgetId, out var cached)
+                && cached is not null
+                && cached is not FrameworkElement { Parent: not null })
+            {
+                return cached;
+            }
+
+            var created = registry.CreateSettingsView(widgetId);
+            _cache[widgetId] = created;
+            return created;
+        }
+    }
+
     [DllImport("user32.dll", EntryPoint = "SendMessageW")]
     private static extern nint SendMessageW(nint hWnd, int msg, nint wParam, nint lParam);
 
@@ -654,6 +923,13 @@ public sealed class ReleaseVerificationUiTests
         {
             var dispatcher = await _dispatcherReady.Task.ConfigureAwait(false);
             return await dispatcher.InvokeAsync(func).Task.ConfigureAwait(false);
+        }
+
+        public async Task RunAsync(Func<Task> asyncAction)
+        {
+            var dispatcher = await _dispatcherReady.Task.ConfigureAwait(false);
+            var task = await dispatcher.InvokeAsync(asyncAction).Task.ConfigureAwait(false);
+            await task.ConfigureAwait(false);
         }
 
         public async Task RunAsync(Action action)

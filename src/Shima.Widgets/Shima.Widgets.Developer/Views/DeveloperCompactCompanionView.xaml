@@ -3,28 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:dev="clr-namespace:Shima.Widgets.Developer"
              Focusable="False"
+             HorizontalAlignment="Stretch"
+             VerticalAlignment="Center"
              AutomationProperties.Name="{Binding BarAccessibleStatus}"
              AutomationProperties.AutomationId="DeveloperCompactCompanionView">
     <UserControl.Resources>
-        <Style x:Key="CompanionAgentDotStyle" TargetType="Ellipse">
-            <Setter Property="Width" Value="5" />
-            <Setter Property="Height" Value="5" />
-            <Setter Property="Fill" Value="{DynamicResource AgentStatusWorkingBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Finished}">
-                    <Setter Property="Fill" Value="{DynamicResource AgentStatusFinishedBrush}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Attention}">
-                    <Setter Property="Fill" Value="{DynamicResource AgentStatusAttentionBrush}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.ErrorFailed}">
-                    <Setter Property="Fill" Value="{DynamicResource AgentStatusErrorBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
         <Style x:Key="CompanionAgentBarStyle" TargetType="ProgressBar">
-            <Setter Property="Width" Value="26" />
             <Setter Property="Height" Value="4" />
             <Setter Property="Minimum" Value="0" />
             <Setter Property="Maximum" Value="100" />
@@ -36,12 +20,15 @@
                         <Border x:Name="PART_Track"
                                 Height="4"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="2">
-                            <Border x:Name="PART_Indicator"
-                                    HorizontalAlignment="Left"
-                                    Height="4"
-                                    Background="{TemplateBinding Foreground}"
-                                    CornerRadius="2" />
+                                CornerRadius="2"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Border x:Name="PART_Indicator"
+                                        HorizontalAlignment="Left"
+                                        Height="4"
+                                        Background="{TemplateBinding Foreground}"
+                                        CornerRadius="2" />
+                            </Grid>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -56,9 +43,6 @@
                 <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Attention}">
                     <Setter Property="Foreground" Value="{DynamicResource AgentStatusAttentionBrush}" />
                 </DataTrigger>
-                <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.Finished}">
-                    <Setter Property="Foreground" Value="{DynamicResource AgentStatusFinishedBrush}" />
-                </DataTrigger>
                 <DataTrigger Binding="{Binding BarVisualState}" Value="{x:Static dev:DeveloperBarVisualState.ErrorFailed}">
                     <Setter Property="Foreground" Value="{DynamicResource AgentStatusErrorBrush}" />
                 </DataTrigger>
@@ -66,22 +50,29 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Height="20"
-            Padding="6,0"
-            CornerRadius="10"
-            Background="{DynamicResource SurfacePillButton}"
-            BorderBrush="{DynamicResource BorderHairline}"
-            BorderThickness="1"
-            VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <Ellipse Style="{StaticResource CompanionAgentDotStyle}"
-                     Margin="0,0,5,0"
-                     VerticalAlignment="Center" />
-            <ProgressBar x:Name="CompanionProgressBar"
-                         Style="{StaticResource CompanionAgentBarStyle}"
-                         Value="{Binding BarFillPercent, Mode=OneWay}"
-                         VerticalAlignment="Center"
-                         AutomationProperties.AutomationId="DeveloperCompanionProgressBar" />
-        </StackPanel>
-    </Border>
+    <Grid x:Name="CompanionTrackRoot"
+          Height="4"
+          HorizontalAlignment="Stretch"
+          VerticalAlignment="Center"
+          ClipToBounds="True">
+        <ProgressBar x:Name="CompanionProgressBar"
+                     Style="{StaticResource CompanionAgentBarStyle}"
+                     Value="{Binding BarFillPercent, Mode=OneWay}"
+                     HorizontalAlignment="Stretch"
+                     VerticalAlignment="Center"
+                     AutomationProperties.AutomationId="DeveloperCompanionProgressBar" />
+        <Border x:Name="CompanionSweepHighlight"
+                Width="44"
+                Height="4"
+                CornerRadius="2"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Background="{DynamicResource AccentBrush}"
+                Opacity="0"
+                IsHitTestVisible="False">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="CompanionSweepTransform" X="-44" />
+            </Border.RenderTransform>
+        </Border>
+    </Grid>
 </UserControl>

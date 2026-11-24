@@ -1,0 +1,33 @@
+# Research: Island Style, Movable Positioning & Below-Island Agent Companion
+
+**Feature**: `002-island-style-drag-companion` | **Date**: `2026-11-24`
+
+## 1. Continuous Concave Notch to Rounded Floating Pill Geometry Morphing
+
+- **Decision**: Parameterize `ConcaveNotchGeometryBuilder.Build(IslandVisualSpec spec, double floatingProgress)` using a continuous cubic Bezier transition on the upper-left and upper-right contours alongside linear bottom-corner radius interpolation toward capsule radii (`Height / 2` for `Collapsed`/`Active`, `BottomRadius` for `Notification`/`Expanded`), toggling top edge stroke cleanly once detached (`floatingProgress > 0.02`).
+- **Rationale**: In `DockedNotch`, the body occupies `[EarRadius .. Width - EarRadius]` while concave ears flare outward to `[0 .. EarRadius]` and `[Width - EarRadius .. Width]`. Keeping inner horizontal walls anchored at `EarRadius` and `Width - EarRadius` while retracting outer ear tips inward to become top-left/top-right convex corner arcs guarantees zero horizontal shift of inner content margins (`ThemeTokens.xaml`) and allows C1-smooth continuous morphing on every animation frame with zero `Path` swapping flicker.
+- **Alternatives Considered**: Cross-fading two separate `Path` elements (causes double-stroke alpha artifacts along shared walls) or animatable `Border.CornerRadius` alone (cannot form concave outer ears at `DockedNotch` state).
+
+## 2. Synchronized VSync Animation & Window Positioning on Per-Monitor DPI
+
+- **Decision**: Coordinate window screen placement transitions (style top-offset morph, drag release snap/edge glide, `Reset Position` glide, and edge/bottom expand glide) via a single VSync `CompositionTarget.Rendering` frame driver scoped strictly to active motion lifetimes (`Stopwatch`-timed `CubicEase` `EaseOut`), detaching immediately upon settle. Pair window positioning via `OverlayWindowAdapter.SetPixelRect` (`SWP_NOACTIVATE`) with live `MorphScaleTransform` interpolation so visual screen bounds move continuously without first teleporting to the clamped target before animating.
+- **Rationale**: WPF `Window.Left` / `Window.Top` `DoubleAnimation` conflicts with Win32 Per-Monitor DPI v2 physical pixel placement (`SetWindowPos`) and clamps poorly across negative-coordinate monitors. Meanwhile, an active `Stopwatch`-driven `CompositionTarget.Rendering` loop already matches Shima's `ThemeRenderer` architecture, guarantees exact frame-by-frame coupling between `SetWindowPos`, `MorphScaleTransform`, and `ConcaveNotchGeometryBuilder`, supports clean mid-flight interruption handoff from current values, and detaches completely when static (`0.0%` idle CPU).
+- **Alternatives Considered**: `DoubleAnimation` on `Window.Top`/`Window.Left` (prone to DPI rounding drift and teleporting on rapid layout size changes); permanent `DispatcherTimer` polling (violates Constitution Principle III zero-idle-CPU mandate).
+
+## 3. Drop Shadow Placement & Hit-Test / Click-Through Integrity
+
+- **Decision**: Render `DropShadowEffect` solely on a dedicated non-hit-testable sibling `<Path x:Name="IslandShadowPath" IsHitTestVisible="False" />` behind `NotchSurfacePath`, dynamically detaching `Effect = null` when settled in `DockedNotch` (`opacity == 0`). Compute host `IslandWindow` transparency margins (`ShadowPadding`) around the visual pill only when Floating, Morphing, Lifting, or displaying `BelowIslandCompanionHost`. Enforce Win32 `WM_NCHITTEST` (`HTTRANSPARENT = -1`) outside the union of `MainIslandSurfaceHost` geometry and visible `BelowIslandCompanionHost` bounds, alongside a `Background="{x:Null}"` window viewport and geometry-gated pointer handlers.
+- **Rationale**: Applying `DropShadowEffect` on the parent grid forces WPF software/shader rasterization across text/controls inside `ActiveLayer` and `ExpandedLayer`. Sibling `IslandShadowPath` preserves sharp vector typography, incurs zero shader pass in resting `DockedNotch` (and keeps default `DockedNotch` dimensions exact `136x28` / `264x34` / `444x176`), and `WM_NCHITTEST` guarantees clicks in the ~5px vertical gap, lateral companion flanks, and shadow margins pass directly to underlying windows across all DPI scales.
+- **Alternatives Considered**: Second independent overlay `HWND` for the below-island pill (introduces dual-window Z-order desync, shadow overlap seams, and tray/fullscreen coordination overhead).
+
+## 4. Drag Initiation Threshold & Interactive Control Isolation
+
+- **Decision**: Gate drag initiation behind a `5.0` DIP distance threshold and an ancestor walk (`CanInitiateDragFromSource`) rejecting `ButtonBase`, `TextBoxBase`, `PasswordBox`, `RangeBase` (`Slider`, `ScrollBar`), `Thumb`, `Selector` (`ComboBox`, `ListBox`), and `Alt` modifier click-through. Use Win32 `GetCursorPos` (with an injectable cursor source for deterministic tests) rather than window-relative mouse coordinates during active moves.
+- **Rationale**: Moving the overlay `HWND` shifts window-relative `MouseEventArgs.GetPosition(this)` coordinates on queued messages, creating feedback jitter unless physical screen coordinates are sampled directly. Releasing mouse below threshold routes cleanly into normal click-to-expand and widget switching.
+- **Alternatives Considered**: WPF `DragMove()` (activates the window, steals foreground focus in violation of `WS_EX_NOACTIVATE`, and cannot enforce `DockedNotch` X-only or work-area soft clamping / post-release snap glide).
+
+## 5. Below-Island Companion Pill Coexistence & Sweep Animation
+
+- **Decision**: Remove inline `ActiveCompanionHost` from `ActiveLayer`, stop suppressing `NowPlayingCompactView`'s trailing `PlayingAccentDot`, and move `BelowIslandCompanionHost` into `RootContainer` behind `MainIslandSurfaceHost` in Z-order so `TranslateTransform.Y` slides out cleanly from behind the main pill with fade and scale (`0.92 -> 1.0`, `~200 ms` `CubicEase EaseOut`) centered `5` DIP below it, hiding (`~160–180 ms` slide-up + fade-out) on idle, urgent agent priority takeover, or `Expanded`/`Notification`/`Collapsed` states. Add a `Working` shimmer sweep/pulse storyboard inside `DeveloperCompactCompanionView` that stops immediately on `Finished` dwell, invisibility, or Reduced Motion.
+- **Rationale**: Reuses existing `IslandStateManager.CompactCompanionWidgetId` arbitration (`Urgent` > `Normal` > `Background`), leaves `NowPlayingCompactView` untouched visually, eliminates truncation on track titles, and naturally masks entry/exit travel behind `MainIslandSurfaceHost`.
+- **Alternatives Considered**: Changing `NowPlayingCompactView` layout proportions (violates requirement keeping Now Playing collapsed layout intact).

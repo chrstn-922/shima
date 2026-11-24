@@ -16,6 +16,24 @@ public partial class NotesSettingsView : UserControl
         _isLoading = true;
         InitializeComponent();
         _isLoading = false;
+        _viewModel.SettingsChanged += (_, _) =>
+        {
+            void Apply()
+            {
+                _isLoading = true;
+                ShowWordCountCheck.IsChecked = _viewModel.ShowWordCount;
+                _isLoading = false;
+            }
+
+            if (Dispatcher.CheckAccess())
+            {
+                Apply();
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(Apply);
+            }
+        };
     }
 
     private async void OnOptionToggled(object sender, RoutedEventArgs e)

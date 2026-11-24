@@ -773,7 +773,7 @@ public sealed class FocusTimerWidgetViewModel : INotifyPropertyChanged, IDisposa
         }
 
         RaiseAllProperties();
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     public void VerifyAndRestoreDisplay()

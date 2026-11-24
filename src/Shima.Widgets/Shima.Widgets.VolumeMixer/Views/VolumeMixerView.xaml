@@ -109,9 +109,11 @@
                     <ColumnDefinition Width="8" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="116" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="34" />
+                    <ColumnDefinition Width="100" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="24" />
                 </Grid.ColumnDefinitions>
 
                 <Button x:Name="MasterMuteButton"
@@ -183,6 +185,17 @@
                            FontSize="11"
                            Typography.NumeralAlignment="Tabular"
                            Foreground="{DynamicResource TextMuted}" />
+
+                <Button x:Name="SettingsGearButton"
+                        Grid.Column="8"
+                        Style="{StaticResource MuteIconButtonStyle}"
+                        Foreground="{DynamicResource TextMuted}"
+                        Content="&#x2699;"
+                        FontSize="12.5"
+                        Click="OnOpenSettingsClicked"
+                        ToolTip="Open Volume Mixer settings"
+                        AutomationProperties.Name="Open Volume Mixer settings"
+                        AutomationProperties.AutomationId="VolumeMixerOpenSettingsButton" />
             </Grid>
         </Border>
 

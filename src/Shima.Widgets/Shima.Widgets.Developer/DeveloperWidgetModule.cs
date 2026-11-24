@@ -52,7 +52,10 @@ public sealed class DeveloperWidgetModule :
 
     public bool ShouldAutoSelectOnExpand => ViewModel.ShouldAutoSelectOnExpand;
 
-    public void OnCollapsedNotchHovered() => ViewModel.AcknowledgeCollapsedBarHoverOrOpen();
+    public void OnCollapsedNotchHovered()
+    {
+        // Alert holds (Attention/Error) persist until Developer Activity is explicitly viewed or timeout expires.
+    }
 
     public async Task InitializeAsync(IWidgetContext context, CancellationToken ct)
     {
@@ -82,7 +85,7 @@ public sealed class DeveloperWidgetModule :
     public Task ActivateAsync(WidgetActivationReason reason)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ViewModel.AcknowledgeCollapsedBarHoverOrOpen();
+        ViewModel.AcknowledgeAlertHold();
         ViewModel.RefreshTimestamps();
         return Task.CompletedTask;
     }

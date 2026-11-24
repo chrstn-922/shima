@@ -244,12 +244,15 @@ public sealed class NowPlayingAndVolumeMixerTests
         {
             try
             {
-                nowPlaying.CreateExpandedView().Should().BeOfType<NowPlayingView>();
+                var nowPlayingView = nowPlaying.CreateExpandedView().Should().BeOfType<NowPlayingView>().Subject;
                 nowPlaying.CreateCompactActiveView().Should().BeOfType<NowPlayingCompactView>();
                 nowPlaying.CreateSettingsView().Should().BeOfType<NowPlayingSettingsView>();
+                nowPlayingView.FindName("SettingsGearButton").Should().BeOfType<Button>();
+                nowPlayingView.FindName("EmptyStateSettingsGearButton").Should().BeOfType<Button>();
 
                 var mixerView = mixer.CreateExpandedView().Should().BeOfType<VolumeMixerView>().Subject;
                 mixer.CreateSettingsView().Should().BeOfType<VolumeMixerSettingsView>();
+                mixerView.FindName("SettingsGearButton").Should().BeOfType<Button>();
 
                 mixer.ViewModel.Sessions.Single().IconBitmap.Should().NotBeNull();
                 mixer.ViewModel.Sessions.Single().IconBitmap!.IsFrozen.Should().BeTrue();
@@ -270,6 +273,31 @@ public sealed class NowPlayingAndVolumeMixerTests
 
         completed.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
         staException.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task NowPlayingAndVolumeMixer_OpenSettings_PublishesTargetSectionRequests()
+    {
+        var now = new DateTimeOffset(2026, 11, 22, 16, 0, 0, TimeSpan.Zero);
+        var events = Substitute.For<IEventDispatcher>();
+        var published = new List<OpenSettingsRequestedEvent>();
+        events.When(e => e.Publish(Arg.Any<OpenSettingsRequestedEvent>()))
+            .Do(ci => published.Add(ci.Arg<OpenSettingsRequestedEvent>()));
+
+        var nowPlayingContext = CreateContext(NowPlayingWidgetModule.Id);
+        nowPlayingContext.Events.Returns(events);
+        await using var nowPlaying = new NowPlayingWidgetModule(new FakeMediaSessionAdapter(), () => now, new FakeNowPlayingTimer());
+        await nowPlaying.InitializeAsync(nowPlayingContext, CancellationToken.None);
+
+        var mixerContext = CreateContext(VolumeMixerWidgetModule.Id);
+        mixerContext.Events.Returns(events);
+        await using var mixer = new VolumeMixerWidgetModule(new FakeAudioMixerAdapter());
+        await mixer.InitializeAsync(mixerContext, CancellationToken.None);
+
+        nowPlaying.ViewModel.OpenSettings();
+        mixer.ViewModel.OpenSettings();
+
+        published.Select(p => p.SectionTag).Should().Equal("Widgets:shima.music", "Widgets:shima.mixer");
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Shima.Core.Contracts;
 using Shima.Infrastructure.Storage;
 
 namespace Shima.Infrastructure.Configuration;
@@ -10,6 +11,41 @@ public enum TargetMonitorMode
     Primary,
     ActiveCursor,
     SpecificMonitorId
+}
+
+public sealed class IslandStyleJsonConverter : JsonConverter<IslandStyle>
+{
+    public override IslandStyle Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            var value = reader.GetString();
+            return Enum.TryParse<IslandStyle>(value, ignoreCase: true, out var parsed)
+                && Enum.IsDefined(parsed)
+                ? parsed
+                : IslandStyle.DockedNotch;
+        }
+
+        if (reader.TokenType == JsonTokenType.Number
+            && reader.TryGetInt32(out var numeric)
+            && Enum.IsDefined(typeof(IslandStyle), numeric))
+        {
+            return (IslandStyle)numeric;
+        }
+
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return IslandStyle.DockedNotch;
+        }
+
+        throw new JsonException($"Invalid island style token '{reader.TokenType}'.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, IslandStyle value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.ToString());
 }
 
 public sealed class TargetMonitorModeJsonConverter : JsonConverter<TargetMonitorMode>
@@ -53,6 +89,11 @@ public sealed class AppPreferences
     public bool StartWithWindows { get; set; }
     public TargetMonitorMode TargetMonitorMode { get; set; } = TargetMonitorMode.Primary;
     public string? SpecificMonitorDeviceId { get; set; }
+    [JsonConverter(typeof(IslandStyleJsonConverter))]
+    public IslandStyle IslandStyle { get; set; } = IslandStyle.DockedNotch;
+    public bool LockIslandPosition { get; set; }
+    public double IslandOffsetXDip { get; set; }
+    public double? IslandFloatingTopOffsetDip { get; set; }
     public bool ExpandOnHover { get; set; } = true;
     public int HoverExpandDelayMs { get; set; } = 350;
     public int AutoCollapseDelayMs { get; set; } = 450;
@@ -108,6 +149,21 @@ public sealed class AppPreferencesStore
         if (!Enum.IsDefined(result.TargetMonitorMode))
         {
             result.TargetMonitorMode = TargetMonitorMode.Primary;
+        }
+
+        if (!Enum.IsDefined(result.IslandStyle))
+        {
+            result.IslandStyle = IslandStyle.DockedNotch;
+        }
+
+        if (!double.IsFinite(result.IslandOffsetXDip))
+        {
+            result.IslandOffsetXDip = 0.0;
+        }
+
+        if (result.IslandFloatingTopOffsetDip is { } topOffset)
+        {
+            result.IslandFloatingTopOffsetDip = double.IsFinite(topOffset) ? Math.Max(0.0, topOffset) : null;
         }
 
         if (result.TargetMonitorMode != TargetMonitorMode.SpecificMonitorId)

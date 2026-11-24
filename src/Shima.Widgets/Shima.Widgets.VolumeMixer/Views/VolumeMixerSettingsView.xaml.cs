@@ -13,11 +13,18 @@ public partial class VolumeMixerSettingsView : UserControl
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         InitializeComponent();
         DataContext = _viewModel;
+        _viewModel.SettingsChanged += (_, _) => SyncCheckBox();
         Loaded += (_, _) => SyncCheckBox();
     }
 
     private void SyncCheckBox()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(SyncCheckBox);
+            return;
+        }
+
         _syncing = true;
         try
         {

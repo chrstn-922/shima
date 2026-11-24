@@ -64,13 +64,28 @@
                            Foreground="{DynamicResource TextMuted}" />
             </StackPanel>
 
-            <Button DockPanel.Dock="Right"
-                    Style="{StaticResource InboxActionButtonStyle}"
-                    Content="Clear all"
-                    Visibility="{Binding HasNotifications, Converter={StaticResource BoolToVis}}"
-                    Click="OnClearAllClicked"
-                    AutomationProperties.Name="Clear all notifications"
-                    AutomationProperties.AutomationId="InboxClearAllButton" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Style="{StaticResource InboxActionButtonStyle}"
+                        Content="Clear all"
+                        Margin="0,0,6,0"
+                        Visibility="{Binding HasNotifications, Converter={StaticResource BoolToVis}}"
+                        Click="OnClearAllClicked"
+                        AutomationProperties.Name="Clear all notifications"
+                        AutomationProperties.AutomationId="InboxClearAllButton" />
+
+                <Button Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="{DynamicResource TextMuted}"
+                        Padding="4,1"
+                        FontFamily="{DynamicResource ShimaFontFamily}"
+                        FontSize="13"
+                        Cursor="Hand"
+                        Content="&#x2699;"
+                        ToolTip="Open Notification Inbox settings"
+                        Click="OnOpenWidgetSettingsClicked"
+                        AutomationProperties.Name="Open Notification Inbox settings"
+                        AutomationProperties.AutomationId="InboxOpenSettingsButton" />
+            </StackPanel>
         </DockPanel>
 
         <!-- Body -->

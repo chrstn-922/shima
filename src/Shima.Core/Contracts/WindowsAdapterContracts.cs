@@ -40,6 +40,17 @@ public interface IOverlayWindowAdapter
 
     void AnchorToMonitor(nint hwnd, MonitorBounds bounds, double dpiScale, DipSize dipSize);
 
+    void SetPixelRect(nint hwnd, MonitorBounds pixelRect)
+    {
+    }
+
+    bool TryGetCursorScreenPosition(out int pixelX, out int pixelY)
+    {
+        pixelX = 0;
+        pixelY = 0;
+        return false;
+    }
+
     void ReassertTopmostZOrder(nint hwnd);
 
     void ShowOverlay(nint hwnd);

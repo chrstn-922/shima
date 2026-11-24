@@ -90,6 +90,12 @@ public sealed class AppPreferencesService : IAppPreferencesService
             StartWithWindows = snapshot.StartWithWindows,
             TargetMonitorMode = ToTargetMode(snapshot.MonitorSelectionMode),
             SpecificMonitorDeviceId = snapshot.SpecificMonitorDeviceId,
+            IslandStyle = Enum.IsDefined(snapshot.IslandStyle) ? snapshot.IslandStyle : IslandStyle.DockedNotch,
+            LockIslandPosition = snapshot.LockIslandPosition,
+            IslandOffsetXDip = double.IsFinite(snapshot.IslandOffsetXDip) ? snapshot.IslandOffsetXDip : 0.0,
+            IslandFloatingTopOffsetDip = snapshot.IslandFloatingTopOffsetDip is { } floatingTop && double.IsFinite(floatingTop)
+                ? Math.Max(0.0, floatingTop)
+                : null,
             ExpandOnHover = snapshot.ExpandOnHover,
             HoverExpandDelayMs = Math.Clamp(snapshot.HoverExpandDelayMs, 0, 2000),
             AutoCollapseDelayMs = Math.Clamp(snapshot.AutoCollapseDelayMs, 100, 5000),
@@ -194,6 +200,10 @@ public sealed class AppPreferencesService : IAppPreferencesService
         StartWithWindows = raw.StartWithWindows,
         MonitorSelectionMode = ToMonitorSelectionMode(raw.TargetMonitorMode),
         SpecificMonitorDeviceId = raw.SpecificMonitorDeviceId,
+        IslandStyle = raw.IslandStyle,
+        LockIslandPosition = raw.LockIslandPosition,
+        IslandOffsetXDip = raw.IslandOffsetXDip,
+        IslandFloatingTopOffsetDip = raw.IslandFloatingTopOffsetDip,
         ExpandOnHover = raw.ExpandOnHover,
         HoverExpandDelayMs = raw.HoverExpandDelayMs,
         AutoCollapseDelayMs = raw.AutoCollapseDelayMs,

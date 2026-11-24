@@ -235,4 +235,50 @@ public sealed class AppearancePersistenceTests : TempDirectoryTest
         File.Exists(bundlePath).Should().BeTrue();
         (await File.ReadAllTextAsync(bundlePath)).Should().NotContain("secret-jwt-token-123");
     }
+
+    [Fact]
+    public async Task AppPreferencesService_PersistsIslandStylePositionAndLockAcrossRestartAndNormalizesInvalidValues()
+    {
+        var store = new AppPreferencesStore(new AtomicConfigStore<AppPreferences>(Root));
+        var dpapi = new DpapiSecretStore();
+        var service = new AppPreferencesService(store, dpapi);
+        await service.InitializeAsync();
+
+        service.Current.IslandStyle.Should().Be(IslandStyle.DockedNotch);
+        service.Current.LockIslandPosition.Should().BeFalse();
+        service.Current.IslandOffsetXDip.Should().Be(0.0);
+        service.Current.IslandFloatingTopOffsetDip.Should().BeNull();
+
+        await service.SaveAsync(service.Current with
+        {
+            IslandStyle = IslandStyle.FloatingPill,
+            LockIslandPosition = true,
+            IslandOffsetXDip = -245.5,
+            IslandFloatingTopOffsetDip = 84.25
+        });
+
+        var restarted = new AppPreferencesService(new AppPreferencesStore(new AtomicConfigStore<AppPreferences>(Root)), dpapi);
+        await restarted.InitializeAsync();
+        restarted.Current.IslandStyle.Should().Be(IslandStyle.FloatingPill);
+        restarted.Current.LockIslandPosition.Should().BeTrue();
+        restarted.Current.IslandOffsetXDip.Should().BeApproximately(-245.5, 0.001);
+        restarted.Current.IslandFloatingTopOffsetDip.Should().BeApproximately(84.25, 0.001);
+
+        // NaN/Negative normalization check
+        var normalized = AppPreferencesStore.Normalize(new AppPreferences
+        {
+            IslandStyle = (IslandStyle)999,
+            IslandOffsetXDip = double.NaN,
+            IslandFloatingTopOffsetDip = -42.0
+        });
+        normalized.IslandStyle.Should().Be(IslandStyle.DockedNotch);
+        normalized.IslandOffsetXDip.Should().Be(0.0);
+        normalized.IslandFloatingTopOffsetDip.Should().Be(0.0);
+
+        await restarted.ResetToDefaultsAsync();
+        restarted.Current.IslandStyle.Should().Be(IslandStyle.DockedNotch);
+        restarted.Current.LockIslandPosition.Should().BeFalse();
+        restarted.Current.IslandOffsetXDip.Should().Be(0.0);
+        restarted.Current.IslandFloatingTopOffsetDip.Should().BeNull();
+    }
 }

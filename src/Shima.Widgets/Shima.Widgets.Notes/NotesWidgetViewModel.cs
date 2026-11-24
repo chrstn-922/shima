@@ -321,6 +321,9 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
     public void AttachUiDispatcher(Action<Action> dispatch) =>
         _uiDispatcher = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
 
+    public void OpenSettings() =>
+        _context?.Events.Publish(new OpenSettingsRequestedEvent("Widgets:shima.notes"));
+
     public async Task InitializeAsync(IWidgetContext context, CancellationToken ct = default)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -736,7 +739,7 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
         }
 
         DispatchToUi(() => OnPropertyChanged(nameof(ShowWordCount)));
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     public async Task ResetToDefaultsAsync(CancellationToken ct = default)
@@ -754,7 +757,7 @@ public sealed class NotesWidgetViewModel : INotifyPropertyChanged, IDisposable
         }
 
         DispatchToUi(() => OnPropertyChanged(nameof(ShowWordCount)));
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     public void Dispose()

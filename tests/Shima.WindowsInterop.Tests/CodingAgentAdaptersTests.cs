@@ -867,7 +867,7 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         requester.UpdateCompactPill("shima.focus", null);
         stateManager.CompactActiveWidgetId.Should().Be("shima.music"); // Yielded to Now Playing!
 
-        // 4. Actionable AwaitingApproval takes Urgent compact-pill precedence & emits peek with Allow/Deny
+        // 4. Actionable AwaitingApproval emits peek with Allow/Deny and holds Background companion alongside Now Playing for 45s
         fakeClaude.EmitSession(new AgentSessionSnapshot(
             "claude-code:c1", "claude-code", "api", @"C:\repos\api", 3322,
             AgentStatus.AwaitingApproval, false, AgentConnectionState.Connected,
@@ -875,7 +875,10 @@ public sealed class CodingAgentAdaptersTests : IDisposable
 
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Attention);
         module.ViewModel.BarFillBrushKey.Should().Be("AgentStatusAttentionBrush");
-        stateManager.CompactActiveWidgetId.Should().Be(DeveloperWidgetModule.Id);
+        errorTimer.IsPending.Should().BeTrue();
+        errorTimer.LastDelay.Should().Be(DeveloperWidgetViewModel.AlertBarHoldDuration);
+        stateManager.CompactActiveWidgetId.Should().Be("shima.music");
+        stateManager.CompactCompanionWidgetId.Should().Be(DeveloperWidgetModule.Id);
         peeks.Should().ContainSingle(p => p.PrimaryAction != null && p.SecondaryAction != null);
 
         var claudeRow = module.ViewModel.Sessions.Single(s => s.SessionId == "claude-code:c1");
@@ -889,7 +892,7 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         claudeRow.ShowApprovalButtons.Should().BeTrue();
         claudeRow.DetailText.Should().Be("Server 500");
 
-        // Approve request -> confirmed update clears urgent compact pill so Now Playing resumes!
+        // Approve request -> confirmed update returns session to Working alongside Now Playing
         fakeClaude.NextApprovalResult = new PermissionActionResult(true, "claude.pipe.ack", null);
         var approveResult = await module.ViewModel.ApproveSessionAsync("claude-code:c1", "req_1");
         approveResult.Confirmed.Should().BeTrue();
@@ -902,7 +905,7 @@ public sealed class CodingAgentAdaptersTests : IDisposable
         module.ViewModel.Sessions.Single(s => s.SessionId == "opencode:s1").CanFocusTerminal.Should().BeFalse();
         (await module.ViewModel.FocusSessionTerminalAsync("opencode:s1")).Should().BeFalse();
 
-        // 5. All sessions finish -> 10s Finished bar dwell + 15m expanded retention
+        // 5. All sessions finish -> immediate hide (Idle) with zero Finished bar dwell, while rows stay 15m in expanded list
         now = now.AddMinutes(2);
         fakeOpenCode.EmitSession(new AgentSessionSnapshot(
             "opencode:s1", "opencode", "shima", @"C:\repos\shima", null,
@@ -913,19 +916,44 @@ public sealed class CodingAgentAdaptersTests : IDisposable
             AgentStatus.Finished, false, AgentConnectionState.Connected,
             "Run migration", null, null, null, false, now.AddMinutes(-2), now));
 
-        module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Finished);
-        module.ViewModel.BarFillBrushKey.Should().Be("AgentStatusFinishedBrush");
-        dwellTimer.IsPending.Should().BeTrue();
-        dwellTimer.LastDelay.Should().Be(DeveloperWidgetViewModel.FinishedBarDwellDuration);
-
-        // Expire 10s dwell -> collapsed bar hides again (Idle), finished rows stay 15m in expanded list
-        dwellTimer.Fire();
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
         module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        dwellTimer.IsPending.Should().BeFalse();
+        stateManager.CompactActiveWidgetId.Should().Be("shima.music");
+        stateManager.CompactCompanionWidgetId.Should().BeNull();
         barVisibilityEvents[^1].IsVisible.Should().BeFalse();
         module.ViewModel.Sessions.Should().HaveCount(2);
 
-        // 6. Fatal Error/Failed holds ErrorFailed bar until hovered or 15m cap; DisplayOff suspends all timers
+        // 6. NeedsAttention holds static amber bar alongside Now Playing across hover/non-developer expand; 45s timeout clears it
+        fakeOpenCode.EmitSession(new AgentSessionSnapshot(
+            "opencode:attn", "opencode", "shima", @"C:\repos\shima", null,
+            AgentStatus.NeedsAttention, IsFatalError: false, AgentConnectionState.Connected,
+            "Waiting input", null, null, null, false, now, now));
+
+        module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Attention);
+        module.ViewModel.BarFillBrushKey.Should().Be("AgentStatusAttentionBrush");
+        stateManager.CompactCompanionWidgetId.Should().Be(DeveloperWidgetModule.Id);
+        errorTimer.IsPending.Should().BeTrue();
+        errorTimer.LastDelay.Should().Be(DeveloperWidgetViewModel.AlertBarHoldDuration);
+
+        module.OnCollapsedNotchHovered();
+        module.OnShellStateChanged(IslandShellState.Expanded);
+        module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Attention);
+
+        // DisplayOff suspends timers cleanly and AC restores remaining alert timeout
+        module.OnPowerProfileChanged(PowerProfile.DisplayOff);
+        module.ViewModel.HasPendingTimers.Should().BeFalse();
+        module.OnPowerProfileChanged(PowerProfile.AC);
+        errorTimer.IsPending.Should().BeTrue();
+
+        // Fallback 45s timeout expires -> hides bar while retaining row in list
+        errorTimer.Fire();
+        module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
+        module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        stateManager.CompactCompanionWidgetId.Should().BeNull();
+        module.ViewModel.DismissSession("opencode:attn");
+
+        // 7. Fatal ErrorFailed holds static red bar alongside Now Playing until Developer Activity is viewed (ActivateAsync)
         fakeOpenCode.EmitSession(new AgentSessionSnapshot(
             "opencode:err", "opencode", "shima", @"C:\repos\shima", null,
             AgentStatus.NeedsAttention, IsFatalError: true, AgentConnectionState.Connected,
@@ -933,18 +961,12 @@ public sealed class CodingAgentAdaptersTests : IDisposable
 
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.ErrorFailed);
         module.ViewModel.BarFillBrushKey.Should().Be("AgentStatusErrorBrush");
-        errorTimer.IsPending.Should().BeTrue();
-        errorTimer.LastDelay.Should().Be(DeveloperWidgetViewModel.ErrorBarMaxDwellDuration);
+        stateManager.CompactCompanionWidgetId.Should().Be(DeveloperWidgetModule.Id);
 
-        // DisplayOff suspends timers cleanly (0% idle CPU)
-        module.OnPowerProfileChanged(PowerProfile.DisplayOff);
-        module.ViewModel.HasPendingTimers.Should().BeFalse();
-        module.OnPowerProfileChanged(PowerProfile.AC);
-
-        // Hover collapsed bar acknowledges ErrorFailed -> hides bar while retaining row for 15m
-        module.OnCollapsedNotchHovered();
+        await module.ActivateAsync(WidgetActivationReason.UserSelection);
         module.ViewModel.BarVisualState.Should().Be(DeveloperBarVisualState.Idle);
         module.ViewModel.IsCollapsedBarVisible.Should().BeFalse();
+        stateManager.CompactCompanionWidgetId.Should().BeNull();
         barVisibilityEvents[^1].IsVisible.Should().BeFalse();
         module.ViewModel.Sessions.Should().Contain(s => s.SessionId == "opencode:err");
 

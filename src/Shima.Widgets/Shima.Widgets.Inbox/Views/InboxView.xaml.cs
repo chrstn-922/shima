@@ -28,6 +28,12 @@ public partial class InboxView : UserControl
     private void OnClearAllClicked(object sender, RoutedEventArgs e) =>
         _ = _viewModel.ClearAllAsync();
 
+    private void OnOpenWidgetSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenSettings();
+    }
+
     private void OnOpenSettingsClicked(object sender, RoutedEventArgs e) =>
         _viewModel.OpenWindowsNotificationSettings();
 

@@ -29,6 +29,12 @@ public partial class VolumeMixerView : UserControl
     private async void OnMasterMuteClicked(object sender, RoutedEventArgs e) =>
         await _viewModel.ToggleMasterMuteAsync().ConfigureAwait(true);
 
+    private void OnOpenSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenSettings();
+    }
+
     private void OnMasterSliderMouseDown(object sender, MouseButtonEventArgs e) =>
         _viewModel.IsMasterDragging = true;
 

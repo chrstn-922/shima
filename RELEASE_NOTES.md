@@ -1,13 +1,26 @@
 ﻿# Shima v1.0.1
 
-Maintenance release focused on portable-build identity, OpenCode v2 compatibility, compact pill multitasking, and release automation.
+Maintenance release focused on shell customization (Movable Island & Floating Pill style), multitasking companion status bar, widget settings stability, portable-build identity, OpenCode v2 compatibility, and release automation.
 
 ## Fixes
+- **Widget settings configuration button crash:** Fixed an issue where clicking the settings button in Now Playing or other widgets crashed or force-closed the app. Cleaned settings tab routing across all widgets through `IWidgetRegistrySettingsCoordinator`, added UI dispatcher thread guards on viewmodel notifications, and replaced blocking synchronous container disposal with clean async disposal on shutdown.
 - **Win32 error 15700 in portable `.zip` and `dotnet run` builds:** Shima now ships split application manifests. The default `app.manifest` no longer embeds the Sparse MSIX `<msix>` element, while installer/MSIX builds use `app.sparse.manifest` (`-p:UseSparsePackageManifest=true`). Unpackaged builds no longer claim a package identity they don't have, and release packaging verifies each `Shima.App.exe` contains or omits the element as intended.
 - **Notification Inbox preferences-change race condition:** Serialized `OnPreferencesChanged` pruning and group refreshes through `_workGate` and added a monotonic `_refreshVersion` check in `InboxWidgetViewModel` so an in-flight or out-of-order refresh cannot overwrite a newer notification dismissal with a stale unread count.
 
-## Dynamic Island & Developer Activity
-- **Green Agent companion pill alongside Now Playing:** When media is playing and Developer Activity has an active background session (`Working` or `Finished` dwell), album art and the track title remain on the left while a compact green Agent progress pill smoothly animates into the right side of the compact pill in place of the playing accent dot. Urgent agent states (`AwaitingApproval`, `NeedsAttention`, `ErrorFailed`) retain full compact-pill priority, and the companion pill smoothly fades and collapses back to the normal music layout when idle (respecting Windows Reduced Motion).
+## Shell & Dynamic Island
+- **Movable Island & Floating Pill style:**
+  - **Island Style setting:** Switch between **Docked Notch** (flush against the top edge with concave outer ear curves) and **Floating Pill** (detached ~10–12px below top edge as a 4-corner rounded capsule with subtle elevation shadow). Persisted across restarts.
+  - **Repositioning & dragging:** Drag the island freely (with a 5px gesture threshold so normal clicks and widget switching are never intercepted). Docked Notch mode constrains dragging horizontally along the monitor top edge; Floating Pill mode allows free X/Y positioning anywhere within the active display work area.
+  - **Multi-monitor work-area clamping:** Automatically clamps both compact and expanded island bounds so expanding near display edges or bottoms never clips off-screen, smoothly gliding into safe bounds.
+  - **Magnetic center snap & controls:** Snaps magnetically to center when dropped within 16px of top-center. Settings and tray menu include **Lock Position** and **Reset Position** options.
+  - **Fluid animations:** Smooth morph transitions between Docked and Floating styles (~220ms CubicEase EaseOut), subtle lift/settle shadow on drag and hover, and zero-duration immediate snapping when Windows Reduced Motion is enabled. Non-client hit-testing (`WM_NCHITTEST`) ensures clicks around the floating capsule pass through cleanly to underlying desktop windows.
+
+## Developer Activity
+- **Bottom-edge compact companion bar:** When media is playing and Developer Activity has an active background task, the collapsed Now Playing pill stays intact (album art, track title, and playing dot) while a slim, rounded progress bar appears along the bottom inner edge of the collapsed pill:
+  - **Working:** Smooth green sweep and subtle breathing animation while agents work.
+  - **Done (`Finished` / `Idle`):** Immediately collapses and fades away (removing lingering dwell).
+  - **Alerts (`NeedsAttention`, `AwaitingApproval`, `ErrorFailed`):** Turns solid amber (warning) or red (error) with animations held still. Stays visible until either the user expands the island to view Developer Activity or a 45-second fallback timeout expires.
+  - **Hides on expansion:** Automatically hides when the island expands to full widget view. Fully respects Windows Reduced Motion.
 - **OpenCode v2 compatibility:**
   - Plugin manifest now uses the v2 `{ id, setup(ctx) }` export shape.
   - Event parsing accepts the v2 `data` envelope and nested session/location fields.

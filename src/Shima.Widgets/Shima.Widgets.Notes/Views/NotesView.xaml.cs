@@ -100,6 +100,12 @@ public partial class NotesView : UserControl
         }
     }
 
+    private void OnOpenSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenSettings();
+    }
+
     private void BringSelectedNoteIntoView()
     {
         Dispatcher.BeginInvoke(

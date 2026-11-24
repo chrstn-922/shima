@@ -35,6 +35,12 @@ public partial class NowPlayingView : UserControl
     private async void OnNextClicked(object sender, RoutedEventArgs e) =>
         await _viewModel.NextTrackAsync().ConfigureAwait(true);
 
+    private void OnSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenSettings();
+    }
+
     private void OnSeekPreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (_viewModel.CanSeek)

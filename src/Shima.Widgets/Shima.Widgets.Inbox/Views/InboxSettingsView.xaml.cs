@@ -18,6 +18,24 @@ public partial class InboxSettingsView : UserControl
         InitializeComponent();
         SyncControlsFromViewModel();
         _isLoading = false;
+        _viewModel.SettingsChanged += (_, _) =>
+        {
+            void Apply()
+            {
+                _isLoading = true;
+                SyncControlsFromViewModel();
+                _isLoading = false;
+            }
+
+            if (Dispatcher.CheckAccess())
+            {
+                Apply();
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(Apply);
+            }
+        };
     }
 
     private void SyncControlsFromViewModel()

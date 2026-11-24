@@ -244,6 +244,38 @@
                                       SelectionChanged="OnBehaviorSelectionChanged"
                                       AutomationProperties.AutomationId="SpecificMonitorCombo" />
 
+                            <TextBlock Text="Island style"
+                                       FontFamily="{DynamicResource ShimaFontFamily}"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Margin="0,0,0,6" />
+                            <ComboBox x:Name="IslandStyleCombo"
+                                      Width="280"
+                                      HorizontalAlignment="Left"
+                                      Margin="0,0,0,10"
+                                      SelectionChanged="OnBehaviorSelectionChanged"
+                                      AutomationProperties.AutomationId="IslandStyleCombo">
+                                <ComboBoxItem Tag="DockedNotch" Content="Docked notch (top edge)" />
+                                <ComboBoxItem Tag="FloatingPill" Content="Floating pill" />
+                            </ComboBox>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <CheckBox x:Name="LockIslandPositionCheck"
+                                          Content="Lock island position"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,14,0"
+                                          Checked="OnBehaviorCheckChanged"
+                                          Unchecked="OnBehaviorCheckChanged"
+                                          AutomationProperties.AutomationId="LockIslandPositionCheck" />
+                                <Button x:Name="ResetIslandPositionButton"
+                                        Content="Reset position"
+                                        Style="{StaticResource SettingsActionButtonStyle}"
+                                        Click="OnResetIslandPositionClicked"
+                                        AutomationProperties.AutomationId="ResetIslandPositionButton" />
+                            </StackPanel>
+
                             <CheckBox x:Name="ExpandOnHoverCheck"
                                       Content="Expand island automatically on pointer hover"
                                       Foreground="{DynamicResource TextPrimary}"
@@ -369,6 +401,14 @@
 
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                                 <Button Style="{StaticResource SettingsActionButtonStyle}"
+                                                        Content="Configure"
+                                                        Tag="{Binding WidgetId}"
+                                                        IsEnabled="{Binding CanConfigure}"
+                                                        Margin="0,0,6,0"
+                                                        Click="OnConfigureWidgetClicked"
+                                                        AutomationProperties.Name="{Binding ConfigureLabel}"
+                                                        AutomationProperties.AutomationId="{Binding ConfigureButtonAutomationId}" />
+                                                <Button Style="{StaticResource SettingsActionButtonStyle}"
                                                         Content="Up"
                                                         Tag="{Binding WidgetId}"
                                                         IsEnabled="{Binding CanMoveUp}"
@@ -405,6 +445,11 @@
                                        Visibility="Collapsed" />
                         </StackPanel>
                     </Border>
+
+                    <ContentPresenter x:Name="NowPlayingSettingsHost" />
+                    <ContentPresenter x:Name="NotesSettingsHost" />
+                    <ContentPresenter x:Name="VolumeMixerSettingsHost" />
+                    <ContentPresenter x:Name="SelectedWidgetSettingsHost" />
                 </StackPanel>
 
                 <!-- 3. Notifications -->

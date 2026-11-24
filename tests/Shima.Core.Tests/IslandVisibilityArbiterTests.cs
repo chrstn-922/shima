@@ -262,6 +262,11 @@ public sealed class IslandVisibilityArbiterTests
         manager.CompactActiveWidgetId.Should().Be("shima.music");
         manager.CompactCompanionWidgetId.Should().Be("shima.developer");
 
+        // Alert hold using Background priority also remains alongside Normal primary
+        manager.SetCompactActive("shima.developer", isActive: true, badgeText: "Needs attention", CompactPillPriority.Background);
+        manager.CompactActiveWidgetId.Should().Be("shima.music");
+        manager.CompactCompanionWidgetId.Should().Be("shima.developer");
+
         // Developer goes Idle -> companion clears while Media stays active
         var countBeforeIdle = compactEvents;
         manager.SetCompactActive("shima.developer", isActive: false, badgeText: null, CompactPillPriority.Background);

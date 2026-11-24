@@ -294,6 +294,9 @@ public sealed class VolumeMixerWidgetViewModel : INotifyPropertyChanged
         ApplySnapshot(_audioAdapter.CurrentSnapshot);
     }
 
+    public void OpenSettings() =>
+        _context?.Events.Publish(new OpenSettingsRequestedEvent("Widgets:shima.mixer"));
+
     public async Task InitializeAsync(IWidgetContext context, CancellationToken ct = default)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -415,7 +418,7 @@ public sealed class VolumeMixerWidgetViewModel : INotifyPropertyChanged
 
         DispatchToUi(() => OnPropertyChanged(nameof(ShowSystemSounds)));
         ApplySnapshot(SnapshotCopy());
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     private AudioMixerSnapshot SnapshotCopy()

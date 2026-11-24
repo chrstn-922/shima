@@ -240,6 +240,19 @@
                               Height="12"
                               Stretch="Uniform" />
                     </Button>
+
+                    <Button x:Name="SettingsGearButton"
+                            Style="{StaticResource TransportIconButtonStyle}"
+                            Width="24"
+                            Height="24"
+                            Margin="4,0,0,0"
+                            Foreground="{DynamicResource TextMuted}"
+                            Content="&#x2699;"
+                            FontSize="13"
+                            Click="OnSettingsClicked"
+                            ToolTip="Open Now Playing settings"
+                            AutomationProperties.Name="Open Now Playing settings"
+                            AutomationProperties.AutomationId="NowPlayingOpenSettingsButton" />
                 </StackPanel>
             </Grid>
 
@@ -288,35 +301,50 @@
         </Grid>
 
         <!-- Clean Empty State -->
-        <StackPanel VerticalAlignment="Center"
-                    HorizontalAlignment="Center"
-                    Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}">
-            <Border Width="42"
-                    Height="42"
-                    CornerRadius="21"
-                    Background="{DynamicResource SurfaceElevated}"
-                    BorderBrush="{DynamicResource BorderHairline}"
-                    BorderThickness="1"
-                    HorizontalAlignment="Center"
-                    Margin="0,0,0,8">
-                <Path Data="M11,3 L11,14.5 C10.4,14.2 9.7,14 9,14 C7.1,14 5.5,15.3 5.5,17 C5.5,18.7 7.1,20 9,20 C10.9,20 12.5,18.7 12.5,17 L12.5,7 L18,5.8 L18,12.5 C17.4,12.2 16.7,12 16,12 C14.1,12 12.5,13.3 12.5,15 C12.5,16.7 14.1,18 16,18 C17.9,18 19.5,16.7 19.5,15 L19.5,1.5 L11,3 Z"
-                      Fill="{DynamicResource TextMuted}"
-                      Width="18"
-                      Height="18"
-                      Stretch="Uniform" />
-            </Border>
-            <TextBlock Text="Nothing playing"
-                       HorizontalAlignment="Center"
-                       FontFamily="{DynamicResource ShimaFontFamily}"
-                       FontSize="13.5"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimary}" />
-            <TextBlock Text="Start audio or video playback in any media app."
-                       HorizontalAlignment="Center"
-                       Margin="0,2,0,0"
-                       FontFamily="{DynamicResource ShimaFontFamily}"
-                       FontSize="11.5"
-                       Foreground="{DynamicResource TextMuted}" />
-        </StackPanel>
+        <Grid Visibility="{Binding ShowEmptyState, Converter={StaticResource BoolToVis}}">
+            <Button x:Name="EmptyStateSettingsGearButton"
+                    Style="{StaticResource TransportIconButtonStyle}"
+                    Width="24"
+                    Height="24"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Foreground="{DynamicResource TextMuted}"
+                    Content="&#x2699;"
+                    FontSize="13"
+                    Click="OnSettingsClicked"
+                    ToolTip="Open Now Playing settings"
+                    AutomationProperties.Name="Open Now Playing settings"
+                    AutomationProperties.AutomationId="NowPlayingEmptyOpenSettingsButton" />
+
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center">
+                <Border Width="42"
+                        Height="42"
+                        CornerRadius="21"
+                        Background="{DynamicResource SurfaceElevated}"
+                        BorderBrush="{DynamicResource BorderHairline}"
+                        BorderThickness="1"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,8">
+                    <Path Data="M11,3 L11,14.5 C10.4,14.2 9.7,14 9,14 C7.1,14 5.5,15.3 5.5,17 C5.5,18.7 7.1,20 9,20 C10.9,20 12.5,18.7 12.5,17 L12.5,7 L18,5.8 L18,12.5 C17.4,12.2 16.7,12 16,12 C14.1,12 12.5,13.3 12.5,15 C12.5,16.7 14.1,18 16,18 C17.9,18 19.5,16.7 19.5,15 L19.5,1.5 L11,3 Z"
+                          Fill="{DynamicResource TextMuted}"
+                          Width="18"
+                          Height="18"
+                          Stretch="Uniform" />
+                </Border>
+                <TextBlock Text="Nothing playing"
+                           HorizontalAlignment="Center"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="13.5"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}" />
+                <TextBlock Text="Start audio or video playback in any media app."
+                           HorizontalAlignment="Center"
+                           Margin="0,2,0,0"
+                           FontFamily="{DynamicResource ShimaFontFamily}"
+                           FontSize="11.5"
+                           Foreground="{DynamicResource TextMuted}" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

@@ -275,7 +275,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Compact right-aligned action row: Save, Pin, Copy, Delete -->
+            <!-- Compact right-aligned action row: Save, Pin, Copy, Delete, Settings -->
             <StackPanel Grid.Row="0"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
@@ -303,10 +303,18 @@
                         AutomationProperties.AutomationId="NotesCopyButton" />
                 <Button Style="{StaticResource NoteActionButtonStyle}"
                         Content="Delete"
+                        Margin="0,0,3,0"
                         IsEnabled="{Binding HasActiveNote}"
                         Click="OnDeleteActiveClicked"
                         AutomationProperties.Name="Delete selected note"
                         AutomationProperties.AutomationId="NotesDeleteButton" />
+                <Button Style="{StaticResource NoteActionButtonStyle}"
+                        Content="&#x2699;"
+                        Padding="5,2"
+                        Click="OnOpenSettingsClicked"
+                        ToolTip="Open Notes settings"
+                        AutomationProperties.Name="Open Notes settings"
+                        AutomationProperties.AutomationId="NotesOpenSettingsButton" />
             </StackPanel>
 
             <!-- Compact footer: save status + word/char count below the editor -->

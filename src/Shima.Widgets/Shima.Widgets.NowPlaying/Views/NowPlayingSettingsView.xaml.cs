@@ -13,11 +13,18 @@ public partial class NowPlayingSettingsView : UserControl
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         InitializeComponent();
         DataContext = _viewModel;
+        _viewModel.SettingsChanged += (_, _) => SyncCheckBoxes();
         Loaded += (_, _) => SyncCheckBoxes();
     }
 
     private void SyncCheckBoxes()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(SyncCheckBoxes);
+            return;
+        }
+
         _syncing = true;
         try
         {

@@ -16,10 +16,17 @@ public partial class FocusTimerSettingsView : UserControl
         DataContext = _viewModel;
         InitializeComponent();
         SyncTextBoxesFromViewModel();
+        _viewModel.SettingsChanged += (_, _) => SyncTextBoxesFromViewModel();
     }
 
     private void SyncTextBoxesFromViewModel()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(SyncTextBoxesFromViewModel);
+            return;
+        }
+
         _syncing = true;
         try
         {

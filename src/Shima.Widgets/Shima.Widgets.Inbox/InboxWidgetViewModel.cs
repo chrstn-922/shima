@@ -274,6 +274,9 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
     public void AttachUiDispatcher(Action<Action> dispatch) =>
         _uiDispatcher = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
 
+    public void OpenSettings() =>
+        _context?.Events.Publish(new OpenSettingsRequestedEvent("Notifications"));
+
     public async Task InitializeAsync(IWidgetContext context, CancellationToken ct = default)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -478,7 +481,7 @@ public sealed class InboxWidgetViewModel : INotifyPropertyChanged, IDisposable
         }
 
         RaiseSettingsProperties();
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     internal async Task WaitForPendingWorkAsync()

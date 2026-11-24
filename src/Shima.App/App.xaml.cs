@@ -289,6 +289,11 @@ public partial class App : Application
                 });
             };
 
+            islandWindow.PositionCommitted += (_, pos) =>
+            {
+                _ = PersistCommittedPositionAsync(preferencesService, pos, _logger);
+            };
+
             var trayService = _serviceProvider.GetRequiredService<SystemTrayService>();
             trayService.Attach(
                 islandWindow,
@@ -329,13 +334,16 @@ public partial class App : Application
 
         if (_serviceProvider is not null)
         {
+            var provider = _serviceProvider;
+            _serviceProvider = null;
+
             try
             {
-                _serviceProvider.GetService<IZenAudioSynthAdapter>()?.Stop();
-                _serviceProvider.GetService<IZenDisplayEffectAdapter>()?.MarkCleanExit();
+                provider.GetService<IZenAudioSynthAdapter>()?.Stop();
+                provider.GetService<IZenDisplayEffectAdapter>()?.MarkCleanExit();
 
-                var window = _serviceProvider.GetService<IslandWindow>();
-                var clipboardMonitor = _serviceProvider.GetService<IClipboardMonitorAdapter>();
+                var window = provider.GetService<IslandWindow>();
+                var clipboardMonitor = provider.GetService<IClipboardMonitorAdapter>();
                 if (window is not null && clipboardMonitor is not null)
                 {
                     window.RemoveWindowMessageHook(clipboardMonitor.HandleWindowMessage);
@@ -351,8 +359,14 @@ public partial class App : Application
                 // Ignore window teardown failures on process exit.
             }
 
-            _serviceProvider.Dispose();
-            _serviceProvider = null;
+            try
+            {
+                provider.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Ignore container disposal errors on process exit.
+            }
         }
 
         _singleInstanceGuard?.Dispose();
@@ -361,11 +375,21 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private void OnUnhandledDomainException(object sender, UnhandledExceptionEventArgs e) =>
-        RestoreZenHardwareSafely();
+    private void OnUnhandledDomainException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+        {
+            _logger?.Critical("Unhandled AppDomain exception.", ex);
+        }
 
-    private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e) =>
         RestoreZenHardwareSafely();
+    }
+
+    private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+    {
+        _logger?.Critical("Unhandled WPF Dispatcher exception.", e.Exception);
+        RestoreZenHardwareSafely();
+    }
 
     private void RestoreZenHardwareSafely()
     {
@@ -429,6 +453,26 @@ public partial class App : Application
         islandWindow.SetWidgetSlots(slots, widgetRegistry.ActiveWidgetId);
     }
 
+    private static async Task PersistCommittedPositionAsync(
+        IAppPreferencesService preferencesService,
+        IslandPositionCommittedEventArgs pos,
+        ILogger? logger)
+    {
+        try
+        {
+            var next = preferencesService.Current with
+            {
+                IslandOffsetXDip = pos.OffsetXDip,
+                IslandFloatingTopOffsetDip = pos.FloatingTopOffsetDip
+            };
+            await preferencesService.SaveAsync(next).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger?.Warn("Failed to persist committed island position.", ex);
+        }
+    }
+
     private static void ApplyPreferencesToShell(IslandWindow islandWindow, AppPreferencesSnapshot preferences) =>
         islandWindow.ApplyBehaviorPreferences(
             preferences.MonitorSelectionMode,
@@ -436,7 +480,11 @@ public partial class App : Application
             preferences.ExpandOnHover,
             preferences.HoverExpandDelayMs,
             preferences.AutoCollapseDelayMs,
-            preferences.FullscreenBreakthroughAlerts);
+            preferences.FullscreenBreakthroughAlerts,
+            preferences.IslandStyle,
+            preferences.LockIslandPosition,
+            preferences.IslandOffsetXDip,
+            preferences.IslandFloatingTopOffsetDip);
 
     private void TryApplyGlobalHotkey(IGlobalHotkeyService hotkeyService, nint hwnd, string? rawGesture)
     {

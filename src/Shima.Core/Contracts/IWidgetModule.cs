@@ -69,3 +69,8 @@ public interface IWidgetModule : IAsyncDisposable
 
     Task ResetSettingsAsync();
 }
+
+public interface IReducedMotionAware
+{
+    void SetReducedMotion(bool isReducedMotion);
+}

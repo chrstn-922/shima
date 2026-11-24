@@ -1,5 +1,11 @@
 namespace Shima.Core.Contracts;
 
+public enum IslandStyle
+{
+    DockedNotch = 0,
+    FloatingPill = 1
+}
+
 /// <summary>
 /// Read-safe snapshot of user preferences across all 10 Settings navigation categories without exposing raw secret ciphertext or plaintext.
 /// </summary>
@@ -8,6 +14,10 @@ public sealed record AppPreferencesSnapshot
     public bool StartWithWindows { get; init; }
     public MonitorSelectionMode MonitorSelectionMode { get; init; } = MonitorSelectionMode.Primary;
     public string? SpecificMonitorDeviceId { get; init; }
+    public IslandStyle IslandStyle { get; init; } = IslandStyle.DockedNotch;
+    public bool LockIslandPosition { get; init; }
+    public double IslandOffsetXDip { get; init; }
+    public double? IslandFloatingTopOffsetDip { get; init; }
     public bool ExpandOnHover { get; init; } = true;
     public int HoverExpandDelayMs { get; init; } = 350;
     public int AutoCollapseDelayMs { get; init; } = 450;

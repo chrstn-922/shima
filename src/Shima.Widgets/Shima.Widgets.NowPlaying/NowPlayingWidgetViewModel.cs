@@ -229,6 +229,9 @@ public sealed class NowPlayingWidgetViewModel : INotifyPropertyChanged
         ApplySession(_mediaAdapter.CurrentSession, _utcNowProvider());
     }
 
+    public void OpenSettings() =>
+        _context?.Events.Publish(new OpenSettingsRequestedEvent("Widgets:shima.music"));
+
     public async Task InitializeAsync(IWidgetContext context, CancellationToken ct = default)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -469,7 +472,7 @@ public sealed class NowPlayingWidgetViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(ShowArtworkInCompactPill));
         });
 
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     public static string? BuildCompactBadgeText(MediaSessionSnapshot? snapshot, NowPlayingSettings settings)
@@ -555,7 +558,7 @@ public sealed class NowPlayingWidgetViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(ShowArtworkInCompactPill));
         });
 
-        SettingsChanged?.Invoke(this, EventArgs.Empty);
+        DispatchToUi(() => SettingsChanged?.Invoke(this, EventArgs.Empty));
     }
 
     private static BitmapSource? TryDecodeArtwork(byte[] bytes)

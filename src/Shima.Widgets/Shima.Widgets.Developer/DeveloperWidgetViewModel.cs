@@ -14,8 +14,7 @@ namespace Shima.Widgets.Developer;
 /// </summary>
 public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposable
 {
-    public static readonly TimeSpan FinishedBarDwellDuration = TimeSpan.FromSeconds(10);
-    public static readonly TimeSpan ErrorBarMaxDwellDuration = TimeSpan.FromMinutes(15);
+    public static readonly TimeSpan AlertBarHoldDuration = TimeSpan.FromSeconds(45);
     public static readonly TimeSpan ExpandedRowRetentionDuration = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan ApprovalPeekTtl = TimeSpan.FromSeconds(15);
 
@@ -37,9 +36,8 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
     private bool _isWidgetEnabled = true;
     private PowerProfile _powerProfile = PowerProfile.AC;
     private DeveloperBarVisualState _barVisualState = DeveloperBarVisualState.Hidden;
-    private DateTimeOffset? _finishedBarExpiresAtUtc;
-    private DateTimeOffset? _errorBarExpiresAtUtc;
-    private bool _errorBarAcknowledged;
+    private DateTimeOffset? _alertBarExpiresAtUtc;
+    private bool _alertBarAcknowledged;
     private string? _lastPeekedRequestId;
     private string _settingsFeedbackMessage = string.Empty;
     private bool _disposed;
@@ -98,7 +96,7 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
     public double BarFillPercent => BarVisualState switch
     {
         DeveloperBarVisualState.Working => 55.0,
-        DeveloperBarVisualState.Attention => 62.0,
+        DeveloperBarVisualState.Attention => 100.0,
         DeveloperBarVisualState.Finished => 100.0,
         DeveloperBarVisualState.ErrorFailed => 100.0,
         _ => 0.0
@@ -155,9 +153,14 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
                     return false;
                 }
 
-                return _sessionRecords.Values.Any(r =>
-                    !r.IsDismissed
-                    && (r.Snapshot.Status is AgentStatus.Working or AgentStatus.AwaitingApproval or AgentStatus.NeedsAttention));
+                var hasWorking = _sessionRecords.Values.Any(r =>
+                    !r.IsDismissed && r.Snapshot.Status == AgentStatus.Working);
+                var hasUnacknowledgedAlert = !_alertBarAcknowledged
+                    && _sessionRecords.Values.Any(r =>
+                        !r.IsDismissed
+                        && r.Snapshot.Status is AgentStatus.AwaitingApproval or AgentStatus.NeedsAttention);
+
+                return hasWorking || hasUnacknowledgedAlert;
             }
         }
     }
@@ -216,19 +219,17 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
 
     public void AcknowledgeCollapsedBarHoverOrOpen()
     {
+        // Alert holds remain visible until Developer Activity is explicitly viewed (AcknowledgeAlertHold) or timeout expires.
+    }
+
+    public void AcknowledgeAlertHold()
+    {
         bool changed;
         lock (_sync)
         {
-            changed = _finishedBarExpiresAtUtc is not null
-                || (_errorBarExpiresAtUtc is not null && !_errorBarAcknowledged);
-
-            _finishedBarExpiresAtUtc = null;
-            if (_errorBarExpiresAtUtc is not null)
-            {
-                _errorBarAcknowledged = true;
-                _errorBarExpiresAtUtc = null;
-            }
-
+            changed = _alertBarExpiresAtUtc is not null || !_alertBarAcknowledged;
+            _alertBarAcknowledged = true;
+            _alertBarExpiresAtUtc = null;
             _finishedDwellTimer.Cancel();
             _errorCapTimer.Cancel();
         }
@@ -413,7 +414,6 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
         }
         else if (newState == IslandShellState.Expanded)
         {
-            AcknowledgeCollapsedBarHoverOrOpen();
             RefreshTimestamps();
         }
     }
@@ -434,7 +434,25 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
 
         if (previous == PowerProfile.DisplayOff)
         {
-            PurgeExpiredRows(_utcNowProvider());
+            var now = _utcNowProvider().ToUniversalTime();
+            lock (_sync)
+            {
+                if (_alertBarExpiresAtUtc.HasValue && !_alertBarAcknowledged)
+                {
+                    var remaining = _alertBarExpiresAtUtc.Value - now;
+                    if (remaining > TimeSpan.Zero)
+                    {
+                        _errorCapTimer.Schedule(remaining, OnAlertBarTimeoutExpired);
+                    }
+                    else
+                    {
+                        _alertBarExpiresAtUtc = null;
+                        _alertBarAcknowledged = true;
+                    }
+                }
+            }
+
+            PurgeExpiredRows(now);
             RecomputeAllStates(emitEvents: true);
             ArmOrCancelRetentionTimer();
         }
@@ -457,9 +475,7 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
     public void OpenSettings() =>
         _context?.Events.Publish(new OpenSettingsRequestedEvent("DeveloperIntegrations"));
 
-    internal void TriggerFinishedDwellExpiredForTesting() => OnFinishedBarDwellExpired();
-
-    internal void TriggerErrorCapExpiredForTesting() => OnErrorBarCapExpired();
+    internal void TriggerAlertTimeoutExpiredForTesting() => OnAlertBarTimeoutExpired();
 
     internal void PurgeExpiredRowsForTesting(DateTimeOffset nowUtc) => PurgeExpiredRows(nowUtc);
 
@@ -600,30 +616,33 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
                 actionablePeekSnapshot = snapshot;
             }
 
-            // Finished bar dwell: if session transitioned to Finished and no active sessions remain, hold 10s
-            if (snapshot.Status == AgentStatus.Finished && previousStatus != AgentStatus.Finished)
+            // Clear Finished dwell immediately; companion/collapsed bar hides as soon as work finishes
+            if (snapshot.Status == AgentStatus.Finished)
             {
-                _finishedBarExpiresAtUtc = now + FinishedBarDwellDuration;
-                if (_powerProfile != PowerProfile.DisplayOff)
-                {
-                    _finishedDwellTimer.Schedule(FinishedBarDwellDuration, OnFinishedBarDwellExpired);
-                }
+                _finishedDwellTimer.Cancel();
+                _alertBarExpiresAtUtc = null;
+                _alertBarAcknowledged = false;
+                _errorCapTimer.Cancel();
             }
-            else if (snapshot.Status is AgentStatus.Working or AgentStatus.AwaitingApproval)
+            else if (snapshot.Status == AgentStatus.Working)
             {
-                _finishedBarExpiresAtUtc = null;
                 _finishedDwellTimer.Cancel();
             }
-
-            // Fatal error collapsed bar: hold up to 15m unless acknowledged
-            var isNowFatal = snapshot.IsFatalError && snapshot.Status == AgentStatus.NeedsAttention;
-            if (isNowFatal && !wasFatal)
+            else if (snapshot.Status is AgentStatus.AwaitingApproval or AgentStatus.NeedsAttention)
             {
-                _errorBarAcknowledged = false;
-                _errorBarExpiresAtUtc = now + ErrorBarMaxDwellDuration;
-                if (_powerProfile != PowerProfile.DisplayOff)
+                var isNewAlert = previousStatus != snapshot.Status
+                    || wasFatal != snapshot.IsFatalError
+                    || !string.Equals(previousReqId, snapshot.PendingRequestId, StringComparison.Ordinal)
+                    || (!_alertBarAcknowledged && !_alertBarExpiresAtUtc.HasValue);
+
+                if (isNewAlert)
                 {
-                    _errorCapTimer.Schedule(ErrorBarMaxDwellDuration, OnErrorBarCapExpired);
+                    _alertBarAcknowledged = false;
+                    _alertBarExpiresAtUtc = now + AlertBarHoldDuration;
+                    if (_powerProfile != PowerProfile.DisplayOff)
+                    {
+                        _errorCapTimer.Schedule(AlertBarHoldDuration, OnAlertBarTimeoutExpired);
+                    }
                 }
             }
         }
@@ -772,22 +791,12 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
         _context.Island.RequestPeekNotification(NotificationPriority.Critical, ApprovalPeekTtl);
     }
 
-    private void OnFinishedBarDwellExpired()
+    private void OnAlertBarTimeoutExpired()
     {
         lock (_sync)
         {
-            _finishedBarExpiresAtUtc = null;
-        }
-
-        RecomputeAllStates(emitEvents: true);
-    }
-
-    private void OnErrorBarCapExpired()
-    {
-        lock (_sync)
-        {
-            _errorBarExpiresAtUtc = null;
-            _errorBarAcknowledged = true;
+            _alertBarExpiresAtUtc = null;
+            _alertBarAcknowledged = true;
         }
 
         RecomputeAllStates(emitEvents: true);
@@ -868,22 +877,17 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
             if (!optedIn)
             {
                 nextBar = DeveloperBarVisualState.Hidden;
-                _finishedBarExpiresAtUtc = null;
-                _errorBarExpiresAtUtc = null;
+                _alertBarExpiresAtUtc = null;
+                _alertBarAcknowledged = false;
                 _finishedDwellTimer.Cancel();
                 _errorCapTimer.Cancel();
             }
             else
             {
-                if (_finishedBarExpiresAtUtc.HasValue && _finishedBarExpiresAtUtc.Value <= now)
+                if (_alertBarExpiresAtUtc.HasValue && _alertBarExpiresAtUtc.Value <= now)
                 {
-                    _finishedBarExpiresAtUtc = null;
-                }
-
-                if (_errorBarExpiresAtUtc.HasValue && _errorBarExpiresAtUtc.Value <= now)
-                {
-                    _errorBarExpiresAtUtc = null;
-                    _errorBarAcknowledged = true;
+                    _alertBarExpiresAtUtc = null;
+                    _alertBarAcknowledged = true;
                 }
 
                 var hasApproval = _sessionRecords.Values.Any(r =>
@@ -894,33 +898,26 @@ public sealed class DeveloperWidgetViewModel : INotifyPropertyChanged, IDisposab
                     !r.IsDismissed && r.Snapshot.Status == AgentStatus.NeedsAttention && r.Snapshot.IsFatalError);
                 var hasWorking = _sessionRecords.Values.Any(r =>
                     !r.IsDismissed && r.Snapshot.Status == AgentStatus.Working);
-                var hasFinishedInDwell = _finishedBarExpiresAtUtc.HasValue
-                    && _sessionRecords.Values.Any(r => !r.IsDismissed && r.Snapshot.Status == AgentStatus.Finished);
 
-                // Strict priority: AwaitingApproval / NeedsAttention [incl. Error/Failed] > Working > Finished [10s dwell] > Idle
-                if (hasApproval || hasNonFatalAttention)
-                {
-                    nextBar = DeveloperBarVisualState.Attention;
-                    compactBadgeText = hasApproval ? "Approval needed" : "Needs attention";
-                    compactPriority = CompactPillPriority.Urgent;
-                }
-                else if (hasFatalError && !_errorBarAcknowledged)
+                // Priority: Unacknowledged Error/Attention (45s hold / until viewed, Background priority so Now Playing stays intact)
+                // > Working (green sweep) > Idle (immediate hide on Finished/Idle).
+                if (hasFatalError && !_alertBarAcknowledged)
                 {
                     nextBar = DeveloperBarVisualState.ErrorFailed;
                     compactBadgeText = "Agent error";
-                    compactPriority = CompactPillPriority.Urgent;
+                    compactPriority = CompactPillPriority.Background;
+                }
+                else if ((hasApproval || hasNonFatalAttention) && !_alertBarAcknowledged)
+                {
+                    nextBar = DeveloperBarVisualState.Attention;
+                    compactBadgeText = hasApproval ? "Approval needed" : "Needs attention";
+                    compactPriority = CompactPillPriority.Background;
                 }
                 else if (hasWorking)
                 {
                     nextBar = DeveloperBarVisualState.Working;
                     var count = _sessionRecords.Values.Count(r => !r.IsDismissed && r.Snapshot.Status == AgentStatus.Working);
                     compactBadgeText = count == 1 ? "Agent working" : $"{count} agents working";
-                    compactPriority = CompactPillPriority.Background;
-                }
-                else if (hasFinishedInDwell)
-                {
-                    nextBar = DeveloperBarVisualState.Finished;
-                    compactBadgeText = "Agent finished";
                     compactPriority = CompactPillPriority.Background;
                 }
                 else

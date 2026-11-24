@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window
     private readonly ILicenseService? _licenseService;
 
     private bool _isLoadingUi;
+    private string? _focusedWidgetSettingsId;
 
     public SettingsWindow(
         IAppearanceManager appearanceManager,
@@ -67,6 +68,7 @@ public partial class SettingsWindow : Window
         _appearanceManager.AppearanceChanged += OnAppearanceChanged;
         _appearanceManager.RenderedAppearanceChanged += OnAppearanceChanged;
         _presetManager.CatalogChanged += OnPresetCatalogChanged;
+        _preferencesService.PreferencesChanged += OnPreferencesServiceChanged;
         Closed += OnSettingsClosed;
 
         NavigationRail.SelectedIndex = 0;
@@ -93,6 +95,23 @@ public partial class SettingsWindow : Window
         RefreshNotificationSettingsHost();
         RefreshClipboardSettingsHost();
         RefreshDeveloperSettingsHost();
+    }
+
+    private void RefreshEmbeddedWidgetSettingsHosts()
+    {
+        NowPlayingSettingsHost.Content = _widgetCoordinator?.CreateSettingsView("shima.music");
+        NotesSettingsHost.Content = _widgetCoordinator?.CreateSettingsView("shima.notes");
+        VolumeMixerSettingsHost.Content = _widgetCoordinator?.CreateSettingsView("shima.mixer");
+
+        if (!string.IsNullOrWhiteSpace(_focusedWidgetSettingsId)
+            && _focusedWidgetSettingsId is not ("shima.music" or "shima.notes" or "shima.mixer" or "shima.clock" or "shima.focus" or "shima.inbox" or "shima.clipboard" or "shima.developer"))
+        {
+            SelectedWidgetSettingsHost.Content = _widgetCoordinator?.CreateSettingsView(_focusedWidgetSettingsId);
+        }
+        else
+        {
+            SelectedWidgetSettingsHost.Content = null;
+        }
     }
 
     private void RefreshDeveloperSettingsHost()
@@ -135,14 +154,137 @@ public partial class SettingsWindow : Window
 
     public void SelectSection(string sectionTag)
     {
+        if (string.IsNullOrWhiteSpace(sectionTag))
+        {
+            return;
+        }
+
+        var normalizedTag = sectionTag.Trim();
+        if (normalizedTag.StartsWith("Widgets:", StringComparison.OrdinalIgnoreCase))
+        {
+            var widgetId = normalizedTag["Widgets:".Length..].Trim();
+            RouteToWidgetConfiguration(widgetId);
+            return;
+        }
+
+        if (TryMapWidgetIdToSection(normalizedTag, out var mappedSection, out var mappedWidgetId))
+        {
+            _focusedWidgetSettingsId = mappedWidgetId;
+            normalizedTag = mappedSection;
+        }
+
         foreach (var item in NavigationRail.Items.OfType<ListBoxItem>())
         {
-            if (string.Equals(item.Tag as string, sectionTag, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(item.Tag as string, normalizedTag, StringComparison.OrdinalIgnoreCase))
             {
                 NavigationRail.SelectedItem = item;
                 break;
             }
         }
+
+        if (string.Equals(normalizedTag, "Widgets", StringComparison.OrdinalIgnoreCase))
+        {
+            BringFocusedWidgetSettingsIntoView();
+        }
+    }
+
+    public void RouteToWidgetConfiguration(string widgetId)
+    {
+        if (string.IsNullOrWhiteSpace(widgetId))
+        {
+            SelectSection("Widgets");
+            return;
+        }
+
+        if (TryMapWidgetIdToSection(widgetId, out var targetSection, out var focusedWidgetId))
+        {
+            _focusedWidgetSettingsId = focusedWidgetId;
+            foreach (var item in NavigationRail.Items.OfType<ListBoxItem>())
+            {
+                if (string.Equals(item.Tag as string, targetSection, StringComparison.OrdinalIgnoreCase))
+                {
+                    NavigationRail.SelectedItem = item;
+                    break;
+                }
+            }
+
+            if (string.Equals(targetSection, "Widgets", StringComparison.OrdinalIgnoreCase))
+            {
+                RefreshEmbeddedWidgetSettingsHosts();
+                BringFocusedWidgetSettingsIntoView();
+            }
+
+            StatusFooterText.Text = $"Opened configuration for '{widgetId}'.";
+            return;
+        }
+
+        _focusedWidgetSettingsId = widgetId;
+        SelectSection("Widgets");
+    }
+
+    private static bool TryMapWidgetIdToSection(string token, out string sectionTag, out string? focusedWidgetId)
+    {
+        switch (token.Trim().ToLowerInvariant())
+        {
+            case "shima.clock":
+                sectionTag = "Clock";
+                focusedWidgetId = null;
+                return true;
+            case "shima.focus":
+            case "focustimer":
+                sectionTag = "FocusTimer";
+                focusedWidgetId = null;
+                return true;
+            case "shima.inbox":
+            case "inbox":
+                sectionTag = "Notifications";
+                focusedWidgetId = null;
+                return true;
+            case "shima.clipboard":
+                sectionTag = "Clipboard";
+                focusedWidgetId = null;
+                return true;
+            case "shima.developer":
+            case "developer":
+                sectionTag = "DeveloperIntegrations";
+                focusedWidgetId = null;
+                return true;
+            case "shima.music":
+            case "nowplaying":
+            case "now playing":
+                sectionTag = "Widgets";
+                focusedWidgetId = "shima.music";
+                return true;
+            case "shima.notes":
+            case "notes":
+                sectionTag = "Widgets";
+                focusedWidgetId = "shima.notes";
+                return true;
+            case "shima.mixer":
+            case "volumemixer":
+            case "volume mixer":
+                sectionTag = "Widgets";
+                focusedWidgetId = "shima.mixer";
+                return true;
+            default:
+                sectionTag = token;
+                focusedWidgetId = null;
+                return false;
+        }
+    }
+
+    private void BringFocusedWidgetSettingsIntoView()
+    {
+        FrameworkElement? host = _focusedWidgetSettingsId switch
+        {
+            "shima.music" => NowPlayingSettingsHost,
+            "shima.notes" => NotesSettingsHost,
+            "shima.mixer" => VolumeMixerSettingsHost,
+            _ when !string.IsNullOrWhiteSpace(_focusedWidgetSettingsId) => SelectedWidgetSettingsHost,
+            _ => null
+        };
+
+        host?.BringIntoView();
     }
 
     private void OnNavigationSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -318,6 +460,17 @@ public partial class SettingsWindow : Window
             }
 
             SpecificMonitorCombo.IsEnabled = prefs.MonitorSelectionMode == MonitorSelectionMode.SpecificMonitorId;
+
+            foreach (var item in IslandStyleCombo.Items.OfType<ComboBoxItem>())
+            {
+                if (Enum.TryParse<IslandStyle>(item.Tag as string, out var style) && style == prefs.IslandStyle)
+                {
+                    IslandStyleCombo.SelectedItem = item;
+                    break;
+                }
+            }
+
+            LockIslandPositionCheck.IsChecked = prefs.LockIslandPosition;
             ExpandOnHoverCheck.IsChecked = prefs.ExpandOnHover;
             FullscreenBreakthroughCheck.IsChecked = prefs.FullscreenBreakthroughAlerts;
             HoverDelayBox.Text = prefs.HoverExpandDelayMs.ToString(CultureInfo.InvariantCulture);
@@ -392,14 +545,18 @@ public partial class SettingsWindow : Window
                     ? "Faulted — reload or reset settings"
                     : item.IsEnabled ? "Enabled on Dynamic Island pager" : "Disabled",
                 item.IsEnabled ? "Disable" : "Enable",
+                item.IsEnabled && !item.IsFaulted,
                 idx > 0,
                 idx < items.Length - 1,
+                $"Configure {item.DisplayName} settings",
+                $"ConfigureWidgetButton_{item.WidgetId}",
                 $"Move {item.DisplayName} up",
                 $"Move {item.DisplayName} down"))
             .ToArray();
 
         WidgetsItemsControl.ItemsSource = vms;
         NoWidgetsText.Visibility = vms.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RefreshEmbeddedWidgetSettingsHosts();
     }
 
     private void RefreshDiagnosticsPanel()
@@ -622,12 +779,33 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private async void OnResetIslandPositionClicked(object sender, RoutedEventArgs e)
+    {
+        var next = _preferencesService.Current with
+        {
+            IslandOffsetXDip = 0.0,
+            IslandFloatingTopOffsetDip = null
+        };
+        await _preferencesService.SaveAsync(next).ConfigureAwait(true);
+        StatusFooterText.Text = "Reset island position to top-center.";
+    }
+
     private async void OnSaveHotkeyClicked(object sender, RoutedEventArgs e)
     {
         await SavePreferencesFromControlsAsync().ConfigureAwait(true);
         StatusFooterText.Text = _hotkeyService is null
             ? "Saved global hotkey preference."
             : "Saved hotkey preference.";
+    }
+
+    private void OnConfigureWidgetClicked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string widgetId })
+        {
+            return;
+        }
+
+        RouteToWidgetConfiguration(widgetId);
     }
 
     private async void OnMoveWidgetUpClicked(object sender, RoutedEventArgs e) =>
@@ -841,6 +1019,13 @@ public partial class SettingsWindow : Window
             mode = parsedMode;
         }
 
+        var islandStyle = IslandStyle.DockedNotch;
+        if (IslandStyleCombo.SelectedItem is ComboBoxItem { Tag: string styleTag }
+            && Enum.TryParse<IslandStyle>(styleTag, out var parsedStyle))
+        {
+            islandStyle = parsedStyle;
+        }
+
         var endpointText = OpenCodeEndpointBox.Text?.Trim();
         var safeEndpoint = string.IsNullOrWhiteSpace(endpointText)
             ? null
@@ -851,6 +1036,8 @@ public partial class SettingsWindow : Window
             StartWithWindows = StartWithWindowsCheck.IsChecked == true,
             MonitorSelectionMode = mode,
             SpecificMonitorDeviceId = SpecificMonitorCombo.SelectedItem as string ?? current.SpecificMonitorDeviceId,
+            IslandStyle = islandStyle,
+            LockIslandPosition = LockIslandPositionCheck.IsChecked == true,
             ExpandOnHover = ExpandOnHoverCheck.IsChecked == true,
             FullscreenBreakthroughAlerts = FullscreenBreakthroughCheck.IsChecked == true,
             HoverExpandDelayMs = ParseIntOrDefault(HoverDelayBox.Text, current.HoverExpandDelayMs),
@@ -917,8 +1104,29 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void OnPreferencesServiceChanged(object? sender, AppPreferencesSnapshot e)
+    {
+        if (_isLoadingUi)
+        {
+            return;
+        }
+
+        if (Dispatcher.CheckAccess())
+        {
+            RefreshPreferencesPanels();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(RefreshPreferencesPanels);
+        }
+    }
+
     private void OnSettingsClosed(object? sender, EventArgs e)
     {
+        NowPlayingSettingsHost.Content = null;
+        NotesSettingsHost.Content = null;
+        VolumeMixerSettingsHost.Content = null;
+        SelectedWidgetSettingsHost.Content = null;
         FocusTimerSettingsHost.Content = null;
         ClockSettingsHost.Content = null;
         InboxSettingsHost.Content = null;
@@ -927,6 +1135,7 @@ public partial class SettingsWindow : Window
         _appearanceManager.AppearanceChanged -= OnAppearanceChanged;
         _appearanceManager.RenderedAppearanceChanged -= OnAppearanceChanged;
         _presetManager.CatalogChanged -= OnPresetCatalogChanged;
+        _preferencesService.PreferencesChanged -= OnPreferencesServiceChanged;
     }
 
     private static int ParseIntOrDefault(string? text, int fallback) =>
@@ -991,8 +1200,11 @@ public partial class SettingsWindow : Window
         string DisplayName,
         string StatusDescription,
         string ToggleActionLabel,
+        bool CanConfigure,
         bool CanMoveUp,
         bool CanMoveDown,
+        string ConfigureLabel,
+        string ConfigureButtonAutomationId,
         string MoveUpLabel,
         string MoveDownLabel);
 }

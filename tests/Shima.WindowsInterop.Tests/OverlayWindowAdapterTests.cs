@@ -82,6 +82,15 @@ public sealed class OverlayWindowAdapterTests
         adapter.HideOverlay(islandHwnd);
         ops.LastShowNoActivate.Should().BeFalse();
         adapter.IsOverlayVisible(islandHwnd).Should().BeFalse();
+
+        var customRect = new MonitorBounds(320, 24, 240, 34);
+        adapter.SetPixelRect(islandHwnd, customRect);
+        ops.LastSetWindowPosRect.Should().Be(customRect);
+
+        ops.CursorPixelPos = (512, 64);
+        adapter.TryGetCursorScreenPosition(out var cursorX, out var cursorY).Should().BeTrue();
+        cursorX.Should().Be(512);
+        cursorY.Should().Be(64);
     }
 
     [Fact]
@@ -224,6 +233,10 @@ public sealed class OverlayWindowAdapterTests
 
         public bool LastShowNoActivate { get; private set; }
 
+        public MonitorBounds LastSetWindowPosRect { get; private set; }
+
+        public (int X, int Y)? CursorPixelPos { get; set; }
+
         public int GetWindowExStyle(nint hwnd) => _styles.GetValueOrDefault(hwnd);
 
         public int SetWindowExStyle(nint hwnd, int exStyle)
@@ -233,7 +246,15 @@ public sealed class OverlayWindowAdapterTests
             return prev;
         }
 
-        public bool SetWindowPos(nint hwnd, nint insertAfterHwnd, int x, int y, int width, int height, uint flags) => true;
+        public bool SetWindowPos(nint hwnd, nint insertAfterHwnd, int x, int y, int width, int height, uint flags)
+        {
+            if (width > 0 || height > 0)
+            {
+                LastSetWindowPosRect = new MonitorBounds(x, y, width, height);
+            }
+
+            return true;
+        }
 
         public bool ShowWindow(nint hwnd, bool showNoActivate)
         {
@@ -250,6 +271,20 @@ public sealed class OverlayWindowAdapterTests
         {
             ForegroundHwnd = hwnd;
             return true;
+        }
+
+        public bool TryGetCursorPos(out int x, out int y)
+        {
+            if (CursorPixelPos is { } pos)
+            {
+                x = pos.X;
+                y = pos.Y;
+                return true;
+            }
+
+            x = 0;
+            y = 0;
+            return false;
         }
     }
 

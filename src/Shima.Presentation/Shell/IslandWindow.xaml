@@ -7,7 +7,7 @@
         Height="28"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="{x:Null}"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="True"
@@ -21,6 +21,10 @@
         MouseMove="OnWindowMouseMove"
         MouseLeave="OnWindowMouseLeave"
         MouseLeftButtonUp="OnWindowMouseLeftButtonUp"
+        PreviewMouseLeftButtonDown="OnWindowPreviewMouseLeftButtonDown"
+        PreviewMouseMove="OnWindowPreviewMouseMove"
+        PreviewMouseLeftButtonUp="OnWindowPreviewMouseLeftButtonUp"
+        LostMouseCapture="OnWindowLostMouseCapture"
         PreviewKeyDown="OnWindowPreviewKeyDown">
     <Window.Resources>
         <ResourceDictionary>
@@ -65,135 +69,154 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid x:Name="RootContainer"
-          RenderTransformOrigin="0.5,0">
-        <Grid.RenderTransform>
-            <ScaleTransform x:Name="MorphScaleTransform" ScaleX="1" ScaleY="1" />
-        </Grid.RenderTransform>
+    <Grid x:Name="WindowViewportGrid" Background="{x:Null}">
+        <Grid x:Name="RootContainer"
+              Width="136"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Top"
+              Background="{x:Null}">
+            <!-- Main Island Surface Capsule / Notch + Inner Content -->
+            <Grid x:Name="MainIslandSurfaceHost"
+                  Width="136"
+                  Height="28"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Top"
+                  RenderTransformOrigin="0,0">
+                <Grid.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="MorphScaleTransform" ScaleX="1" ScaleY="1" CenterX="68" CenterY="0" />
+                        <ScaleTransform x:Name="LiftScaleTransform" ScaleX="1" ScaleY="1" CenterX="68" CenterY="14" />
+                    </TransformGroup>
+                </Grid.RenderTransform>
 
-        <Path x:Name="NotchSurfacePath"
-              Fill="{DynamicResource SurfaceCollapsed}"
-              Stroke="{DynamicResource BorderHairline}"
-              StrokeThickness="1"
-              Stretch="None" />
+                <!-- Dedicated non-hit-testable shadow path keeps text glyphs sharp and zero shader overhead when Docked idle -->
+                <Path x:Name="IslandShadowPath"
+                      Fill="{DynamicResource SurfaceCollapsed}"
+                      StrokeThickness="0"
+                      Stretch="None"
+                      IsHitTestVisible="False"
+                      Visibility="Collapsed" />
 
-        <!-- Collapsed notch status indicator (e.g., opt-in Developer Activity bar) -->
-        <ContentPresenter x:Name="CollapsedOverlayContentPresenter"
-                          Margin="{DynamicResource IslandCollapsedOverlayPadding}"
-                          VerticalAlignment="Bottom"
-                          Visibility="Collapsed" />
+                <Path x:Name="NotchSurfacePath"
+                      Fill="{DynamicResource SurfaceCollapsed}"
+                      Stroke="{DynamicResource BorderHairline}"
+                      StrokeThickness="1"
+                      Stretch="None" />
 
-        <!-- Compact active pill content -->
-        <Grid x:Name="ActiveLayer"
-              Margin="{DynamicResource IslandActivePillPadding}"
-              Visibility="Collapsed">
-            <StackPanel x:Name="ActiveDefaultBadgePanel"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Center">
-                <Ellipse Width="6"
-                         Height="6"
-                         Margin="0,0,8,0"
-                         Fill="{DynamicResource AccentBrush}" />
-                <TextBlock x:Name="ActiveBadgeText"
-                           FontFamily="{DynamicResource ShimaFontFamily}"
-                           FontSize="12"
-                           FontWeight="Medium"
-                           Foreground="{DynamicResource TextPrimary}"
-                           TextTrimming="CharacterEllipsis"
-                           AutomationProperties.Name="Active pill status" />
-            </StackPanel>
-
-            <Grid x:Name="ActiveCustomContentHost"
-                  Visibility="Collapsed">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <ContentPresenter x:Name="ActiveCustomContentPresenter"
-                                  Grid.Column="0"
-                                  VerticalAlignment="Center"
+                <!-- Collapsed notch status indicator (e.g., opt-in Developer Activity bar when alone) -->
+                <ContentPresenter x:Name="CollapsedOverlayContentPresenter"
+                                  Margin="{DynamicResource IslandCollapsedOverlayPadding}"
+                                  VerticalAlignment="Bottom"
                                   Visibility="Collapsed" />
 
+                <!-- Compact active pill content (Now Playing row stays intact) -->
+                <Grid x:Name="ActiveLayer"
+                      Margin="{DynamicResource IslandActivePillPadding}"
+                      Visibility="Collapsed">
+                    <StackPanel x:Name="ActiveDefaultBadgePanel"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Ellipse Width="7"
+                                 Height="7"
+                                 Fill="{DynamicResource AccentBrush}"
+                                 Margin="0,0,7,0"
+                                 VerticalAlignment="Center" />
+                        <TextBlock x:Name="ActiveBadgeText"
+                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   Text="Active"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <ContentPresenter x:Name="ActiveCustomContentPresenter"
+                                      VerticalAlignment="Center"
+                                      Visibility="Collapsed" />
+                </Grid>
+
+                <!-- Bottom-edge Developer Activity companion bar tucked along pill bottom edge -->
                 <Border x:Name="ActiveCompanionHost"
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Right"
-                        Width="0"
+                        Margin="28,0,28,2.5"
+                        Height="4"
+                        VerticalAlignment="Bottom"
+                        HorizontalAlignment="Stretch"
                         Opacity="0"
-                        ClipToBounds="True"
                         Visibility="Collapsed"
+                        IsHitTestVisible="False"
+                        RenderTransformOrigin="0.5,1"
                         AutomationProperties.AutomationId="ActiveCompanionHost">
-                    <ContentPresenter x:Name="ActiveCompanionContentPresenter"
-                                      Margin="8,0,0,0"
-                                      VerticalAlignment="Center" />
+                    <Border.RenderTransform>
+                        <ScaleTransform x:Name="ActiveCompanionScaleTransform" ScaleX="1" ScaleY="0.2" />
+                    </Border.RenderTransform>
+                    <ContentPresenter x:Name="ActiveCompanionContentPresenter" />
                 </Border>
+
+                <!-- Notification peek layer -->
+                <Grid x:Name="NotificationLayer"
+                      Margin="24,10,24,12"
+                      Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock x:Name="NotificationTitleText"
+                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   Text="Notification"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="NotificationBodyText"
+                                   Margin="0,2,0,0"
+                                   FontFamily="{DynamicResource ShimaFontFamily}"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   Text="Tap to open or dismiss."
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button x:Name="NotificationPrimaryActionButton"
+                                Margin="0,0,6,0"
+                                Style="{StaticResource PillActionButtonStyle}"
+                                BorderBrush="{DynamicResource AgentStatusWorkingBrush}"
+                                Foreground="{DynamicResource AgentStatusWorkingBrush}"
+                                Visibility="Collapsed"
+                                Click="OnNotificationPrimaryActionClicked"
+                                AutomationProperties.AutomationId="NotificationPrimaryActionButton" />
+
+                        <Button x:Name="NotificationSecondaryActionButton"
+                                Margin="0,0,6,0"
+                                Style="{StaticResource PillActionButtonStyle}"
+                                BorderBrush="{DynamicResource AgentStatusErrorBrush}"
+                                Foreground="{DynamicResource AgentStatusErrorBrush}"
+                                Visibility="Collapsed"
+                                Click="OnNotificationSecondaryActionClicked"
+                                AutomationProperties.AutomationId="NotificationSecondaryActionButton" />
+
+                        <Button x:Name="DismissNotificationButton"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PillActionButtonStyle}"
+                                Content="Dismiss"
+                                Click="OnDismissNotificationClicked"
+                                AutomationProperties.Name="Dismiss notification"
+                                AutomationProperties.AutomationId="DismissNotificationButton" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Expanded panel hosting widget carousel -->
+                <Grid x:Name="ExpandedLayer"
+                      Margin="{DynamicResource IslandExpandedPadding}"
+                      Visibility="Collapsed">
+                    <shell:WidgetHost x:Name="WidgetHostControl" />
+                </Grid>
             </Grid>
-        </Grid>
-
-        <!-- Notification peek layer -->
-        <Grid x:Name="NotificationLayer"
-              Margin="24,10,24,12"
-              Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
-                <TextBlock x:Name="NotificationTitleText"
-                           FontFamily="{DynamicResource ShimaFontFamily}"
-                           FontSize="13"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextPrimary}"
-                           Text="Notification"
-                           TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="NotificationBodyText"
-                           Margin="0,2,0,0"
-                           FontFamily="{DynamicResource ShimaFontFamily}"
-                           FontSize="11.5"
-                           Foreground="{DynamicResource TextMuted}"
-                           Text="Tap to open or dismiss."
-                           TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-
-            <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center">
-                <Button x:Name="NotificationPrimaryActionButton"
-                        Margin="0,0,6,0"
-                        Style="{StaticResource PillActionButtonStyle}"
-                        BorderBrush="{DynamicResource AgentStatusWorkingBrush}"
-                        Foreground="{DynamicResource AgentStatusWorkingBrush}"
-                        Visibility="Collapsed"
-                        Click="OnNotificationPrimaryActionClicked"
-                        AutomationProperties.AutomationId="NotificationPrimaryActionButton" />
-
-                <Button x:Name="NotificationSecondaryActionButton"
-                        Margin="0,0,6,0"
-                        Style="{StaticResource PillActionButtonStyle}"
-                        BorderBrush="{DynamicResource AgentStatusErrorBrush}"
-                        Foreground="{DynamicResource AgentStatusErrorBrush}"
-                        Visibility="Collapsed"
-                        Click="OnNotificationSecondaryActionClicked"
-                        AutomationProperties.AutomationId="NotificationSecondaryActionButton" />
-
-                <Button x:Name="DismissNotificationButton"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource PillActionButtonStyle}"
-                        Content="Dismiss"
-                        Click="OnDismissNotificationClicked"
-                        AutomationProperties.Name="Dismiss notification"
-                        AutomationProperties.AutomationId="DismissNotificationButton" />
-            </StackPanel>
-        </Grid>
-
-        <!-- Expanded panel hosting widget carousel -->
-        <Grid x:Name="ExpandedLayer"
-              Margin="{DynamicResource IslandExpandedPadding}"
-              Visibility="Collapsed">
-            <shell:WidgetHost x:Name="WidgetHostControl" />
         </Grid>
     </Grid>
 </Window>

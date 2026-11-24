@@ -107,7 +107,7 @@ public sealed class SystemTrayService : IDisposable
                 break;
 
             case CmdResetPosition:
-                _islandWindow?.ReanchorToPrimaryMonitor();
+                _islandWindow?.ResetPosition();
                 break;
 
             case CmdQuit:

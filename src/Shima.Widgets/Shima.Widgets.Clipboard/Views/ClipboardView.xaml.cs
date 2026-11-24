@@ -38,6 +38,12 @@ public partial class ClipboardView : UserControl
     private void OnClearUnpinnedClicked(object sender, RoutedEventArgs e) =>
         _ = _viewModel.ClearUnpinnedAsync();
 
+    private void OnOpenSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenSettings();
+    }
+
     private void OnRecopyClicked(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string entryId })

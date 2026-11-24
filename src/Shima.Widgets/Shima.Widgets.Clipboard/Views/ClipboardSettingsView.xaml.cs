@@ -16,6 +16,25 @@ public partial class ClipboardSettingsView : UserControl
         _isLoading = true;
         InitializeComponent();
         _isLoading = false;
+        _viewModel.SettingsChanged += (_, _) =>
+        {
+            void Apply()
+            {
+                _isLoading = true;
+                CaptureImagesCheck.IsChecked = _viewModel.CaptureImages;
+                PauseClipboardCheck.IsChecked = _viewModel.IsPaused;
+                _isLoading = false;
+            }
+
+            if (Dispatcher.CheckAccess())
+            {
+                Apply();
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(Apply);
+            }
+        };
     }
 
     private async void OnCaptureImagesToggled(object sender, RoutedEventArgs e)

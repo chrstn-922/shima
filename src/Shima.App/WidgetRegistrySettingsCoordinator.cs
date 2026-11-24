@@ -10,6 +10,7 @@ public sealed class WidgetRegistrySettingsCoordinator : IWidgetSettingsCoordinat
 {
     private readonly WidgetRegistry _registry;
     private readonly IWidgetConfigRepository _repository;
+    private readonly Dictionary<string, object?> _cachedSettingsViews = new(StringComparer.Ordinal);
 
     public WidgetRegistrySettingsCoordinator(WidgetRegistry registry, IWidgetConfigRepository repository)
     {
@@ -37,6 +38,11 @@ public sealed class WidgetRegistrySettingsCoordinator : IWidgetSettingsCoordinat
 
     public async Task SetEnabledAsync(string widgetId, bool isEnabled, CancellationToken ct = default)
     {
+        if (!isEnabled)
+        {
+            _cachedSettingsViews.Remove(widgetId);
+        }
+
         await _registry.SetEnabledAsync(widgetId, isEnabled, ct).ConfigureAwait(false);
         WidgetsChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -60,9 +66,25 @@ public sealed class WidgetRegistrySettingsCoordinator : IWidgetSettingsCoordinat
         var state = _registry.Widgets.FirstOrDefault(w => string.Equals(w.Metadata.WidgetId, widgetId, StringComparison.Ordinal));
         if (state is null || !state.IsEnabled || state.IsFaulted)
         {
+            _cachedSettingsViews.Remove(widgetId);
             return null;
         }
 
-        return _registry.CreateSettingsView(widgetId);
+        if (_cachedSettingsViews.TryGetValue(widgetId, out var cached)
+            && cached is not null
+            && cached is not System.Windows.FrameworkElement { Parent: not null })
+        {
+            return cached;
+        }
+
+        var created = _registry.CreateSettingsView(widgetId);
+        if (created is FaultedWidgetFallbackView)
+        {
+            _cachedSettingsViews.Remove(widgetId);
+            return null;
+        }
+
+        _cachedSettingsViews[widgetId] = created;
+        return created;
     }
 }
