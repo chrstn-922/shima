@@ -1,13 +1,13 @@
 ; Shima Windows Installer (Inno Setup 6)
 ; Supports dual-RID packaging via preprocessor defines:
-;   /DAppVersion=1.0.1 /DAppFileVersion=1.0.1.0 /DRid=win-x64 /DSourceDir=... /DOutputDir=...
+;   /DAppVersion=1.0.2 /DAppFileVersion=1.0.2.0 /DRid=win-x64 /DSourceDir=... /DOutputDir=...
 
 #ifndef AppVersion
-  #define AppVersion "1.0.1"
+  #define AppVersion "1.0.2"
 #endif
 
 #ifndef AppFileVersion
-  #define AppFileVersion "1.0.1.0"
+  #define AppFileVersion "1.0.2.0"
 #endif
 
 #ifndef Rid

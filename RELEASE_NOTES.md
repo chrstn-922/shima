@@ -1,11 +1,9 @@
-﻿# Shima v1.0.1
+﻿# Shima v1.0.2
 
-Maintenance release focused on shell customization (Movable Island & Floating Pill style), multitasking companion status bar, widget settings stability, portable-build identity, OpenCode v2 compatibility, and release automation.
+Maintenance and customization release featuring a Movable Island, Floating Pill style option, bottom-edge Developer Activity companion bar, and widget settings stability fixes.
 
 ## Fixes
 - **Widget settings configuration button crash:** Fixed an issue where clicking the settings button in Now Playing or other widgets crashed or force-closed the app. Cleaned settings tab routing across all widgets through `IWidgetRegistrySettingsCoordinator`, added UI dispatcher thread guards on viewmodel notifications, and replaced blocking synchronous container disposal with clean async disposal on shutdown.
-- **Win32 error 15700 in portable `.zip` and `dotnet run` builds:** Shima now ships split application manifests. The default `app.manifest` no longer embeds the Sparse MSIX `<msix>` element, while installer/MSIX builds use `app.sparse.manifest` (`-p:UseSparsePackageManifest=true`). Unpackaged builds no longer claim a package identity they don't have, and release packaging verifies each `Shima.App.exe` contains or omits the element as intended.
-- **Notification Inbox preferences-change race condition:** Serialized `OnPreferencesChanged` pruning and group refreshes through `_workGate` and added a monotonic `_refreshVersion` check in `InboxWidgetViewModel` so an in-flight or out-of-order refresh cannot overwrite a newer notification dismissal with a stale unread count.
 
 ## Shell & Dynamic Island
 - **Movable Island & Floating Pill style:**
@@ -21,6 +19,17 @@ Maintenance release focused on shell customization (Movable Island & Floating Pi
   - **Done (`Finished` / `Idle`):** Immediately collapses and fades away (removing lingering dwell).
   - **Alerts (`NeedsAttention`, `AwaitingApproval`, `ErrorFailed`):** Turns solid amber (warning) or red (error) with animations held still. Stays visible until either the user expands the island to view Developer Activity or a 45-second fallback timeout expires.
   - **Hides on expansion:** Automatically hides when the island expands to full widget view. Fully respects Windows Reduced Motion.
+
+# Shima v1.0.1
+
+Maintenance release focused on portable-build identity, OpenCode v2 compatibility, compact pill multitasking, and release automation.
+
+## Fixes
+- **Win32 error 15700 in portable `.zip` and `dotnet run` builds:** Shima now ships split application manifests. The default `app.manifest` no longer embeds the Sparse MSIX `<msix>` element, while installer/MSIX builds use `app.sparse.manifest` (`-p:UseSparsePackageManifest=true`). Unpackaged builds no longer claim a package identity they don't have, and release packaging verifies each `Shima.App.exe` contains or omits the element as intended.
+- **Notification Inbox preferences-change race condition:** Serialized `OnPreferencesChanged` pruning and group refreshes through `_workGate` and added a monotonic `_refreshVersion` check in `InboxWidgetViewModel` so an in-flight or out-of-order refresh cannot overwrite a newer notification dismissal with a stale unread count.
+
+## Dynamic Island & Developer Activity
+- **Green Agent companion pill alongside Now Playing:** When media is playing and Developer Activity has an active background session (`Working` or `Finished` dwell), album art and the track title remain on the left while a compact green Agent progress pill smoothly animates into the right side of the compact pill in place of the playing accent dot. Urgent agent states (`AwaitingApproval`, `NeedsAttention`, `ErrorFailed`) retain full compact-pill priority, and the companion pill smoothly fades and collapses back to the normal music layout when idle (respecting Windows Reduced Motion).
 - **OpenCode v2 compatibility:**
   - Plugin manifest now uses the v2 `{ id, setup(ctx) }` export shape.
   - Event parsing accepts the v2 `data` envelope and nested session/location fields.
